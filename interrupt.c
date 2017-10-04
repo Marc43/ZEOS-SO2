@@ -8,6 +8,7 @@
 #include <io.h>
 
 #include <zeos_interrupt.h>
+#include <global_vars.h>
 #include <entry.h>
 
 Gate idt[IDT_ENTRIES];
@@ -102,6 +103,7 @@ int read_keyboard(unsigned char* letter) {
 	
 }
 void clock_routine (){
+	++zeos_ticks; //Ticks de reloj
  	zeos_show_clock();
 }
 

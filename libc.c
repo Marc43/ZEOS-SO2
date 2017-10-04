@@ -52,9 +52,17 @@ int write (int fd, char* buffer, int size) {
 			"int $0x80;"
 			"movl %ebp, %esp;"
 			"popl %ebp;"
-			"ret"		       );
+			"ret;"		       );
 
 /*__asm__ __volatile__("int 0x80;"
                   :"=a"(ret):"+b"(fd),"+c"(buffer),"+d"(size):"a");*/
 
+}
+
+int gettime () {
+	__asm__ __volatile__("movl $10, %eax;"
+		"int $0x80;"
+		"movl %ebp, %esp;"
+		"popl %ebp;"
+		"ret;");
 }

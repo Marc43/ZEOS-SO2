@@ -13,6 +13,8 @@
 
 #include <sched.h>
 
+#include <global_vars.h>
+
 #define LECTURA 0
 #define ESCRIPTURA 1
 
@@ -46,7 +48,7 @@ void sys_exit()
 {  
 }
 
-int sys_write(int fd, char* buffer, int size) {
+int sys_write (int fd, char* buffer, int size) {
 	
 	//char* mkernel_buff;
 	//copy_to_user(buffer, mkernel_buff, size);
@@ -58,4 +60,8 @@ int sys_write(int fd, char* buffer, int size) {
 	else return -1; //-1? what means? check the errno table
 
 	return 0;
+}
+
+int sys_getticks () {
+	return zeos_ticks;
 }

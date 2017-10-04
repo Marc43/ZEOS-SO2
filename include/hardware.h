@@ -15,6 +15,7 @@ void set_ldt_reg(Selector ldt);
 void set_task_reg(Selector tr);
 void return_gate(Word ds, Word ss, DWord esp, Word cs, DWord eip);
 
+
 /*
  * enable_int: Assigna la mascara d'interrupcions
  *

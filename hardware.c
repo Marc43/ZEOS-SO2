@@ -6,6 +6,7 @@
 #include <types.h>
 
 extern unsigned int *p_rdtr ;
+
 DWord get_eflags(void)
 {
   register DWord flags;
