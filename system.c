@@ -104,8 +104,8 @@ int __attribute__((__section__(".text.main")))
   enable_int();
   /* Define entries to the IDT and Enable them (Is here the place to do this??) */
  // extern void keyboard_handler(); 
-  setInterruptHandler (33, keyboard_handler, 0); //0 is the Kernel privilege level...
-  setTrapHandler (0x80, system_call_handler, 3); //The only function to use ALL the system calls
+  //setInterruptHandler (33, keyboard_handler, 0); //0 is the Kernel privilege level...
+  //setTrapHandler (0x80, system_call_handler, 3); //The only function to use ALL the system calls
   /*
    * We return from a 'theorical' call to a 'call gate' to reduce our privileges
    * and going to execute 'magically' at 'usr_main'...
