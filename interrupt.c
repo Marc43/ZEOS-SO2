@@ -17,11 +17,11 @@ Register    idtR;
 char char_map[] =
 {
   '\0','\0','1','2','3','4','5','6',
-  '7','8','9','0','\'','ก','\0','\0',
+  '7','8','9','0','\'','ยก','\0','\0',
   'q','w','e','r','t','y','u','i',
   'o','p','`','+','\0','\0','a','s',
-  'd','f','g','h','j','k','l','๑',
-  '\0','บ','\0','็','z','x','c','v',
+  'd','f','g','h','j','k','l','รฑ',
+  '\0','ยบ','\0','รง','z','x','c','v',
   'b','n','m',',','.','-','\0','*',
   '\0','\0','\0','\0','\0','\0','\0','\0',
   '\0','\0','\0','\0','\0','\0','\0','7',
@@ -81,9 +81,12 @@ void setIdt()
   /* Program interrups/exception service routines */
   idtR.base  = (DWord)idt;
   idtR.limit = IDT_ENTRIES * sizeof(Gate) - 1;
-  
-  setInterruptHandler (32, clock_handler, 0);
+
   set_handlers();
+  /* ADD INITIALIZATION CODE FOR INTERRUPT VECTOR */
+  setInterruptHandler (32, clock_handler, 0);
+  setInterruptHandler (33, keyboard_handler, 0);
+  setTrapHandler (0x80, system_call_handler, 3);
 
   set_idt_reg(&idtR);
 }
