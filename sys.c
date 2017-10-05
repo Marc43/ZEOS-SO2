@@ -13,6 +13,8 @@
 
 #include <sched.h>
 
+#include <errno.h>
+
 #define LECTURA 0
 #define ESCRIPTURA 1
 
@@ -55,7 +57,7 @@ int sys_write (int fd, char* buffer, int size) {
 		sys_write_console(buffer, size);
 		return 0;		
 	}
-	else return -1; //-1? what means? check the errno table
+	else return -EMSGSIZE; //-1? what means? check the errno table
 
 	return 0;
 }

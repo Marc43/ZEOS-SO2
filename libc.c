@@ -6,7 +6,25 @@
 
 #include <types.h>
 
-int errno;
+int errno = 0;
+
+void perror() {
+	char* msg;
+	char string [128] = "Seems like all has gone nice! (Or not, but I don't care)...";
+	msg = &string[0];	
+	  
+	if (errno < 0) {
+	
+         if (errno == -38) {
+             char aux [128] = "Function not implemented in ZeOS...";
+        	 msg = &aux [0];
+		}
+ 
+	}
+
+	write (1, msg, strlen(msg));
+}
+
 
 void itoa(int a, char *b)
 {
@@ -55,6 +73,8 @@ int write (int fd, char* buffer, int size) {
 						"ret;"
 						:"=a" ( ret ) ::);
 
+	if (ret < 0) {errno = ret; return -1;}
+
 	return ret;
 
 /*__asm__ __volatile__("int 0x80;"
@@ -71,5 +91,7 @@ int gettime () {
 						"ret;"
 						:"=a" ( ret ) ::);
 
+	if (ret < 0) {errno = ret; return -1;}	
+	
 	return ret;
 }

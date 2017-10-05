@@ -8,18 +8,22 @@
 
 #include <stats.h>
 
-int write(int fd, char *buffer, int size);
+extern int errno;
 
-int gettime();
+void perror ();
 
-void itoa(int a, char *b);
+int write (int fd, char *buffer, int size);
 
-int strlen(char *a);
+int gettime ();
 
-int getpid();
+void itoa (int a, char *b);
 
-int fork();
+int strlen (char *a);
 
-void exit();
+int getpid ();
+
+int fork ();
+
+void exit ();
 
 #endif  /* __LIBC_H__ */

@@ -19,4 +19,4 @@ end
 
 target remote localhost:1234
 display/i $eip
-add-symbol-file user 0x00100060
+add-symbol-file user 0x00100030
