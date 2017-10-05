@@ -13,8 +13,6 @@
 
 #include <sched.h>
 
-#include <global_vars.h>
-
 #define LECTURA 0
 #define ESCRIPTURA 1
 
@@ -62,6 +60,7 @@ int sys_write (int fd, char* buffer, int size) {
 	return 0;
 }
 
-int sys_getticks () {
+int sys_gettime () {
+	
 	return zeos_ticks;
 }

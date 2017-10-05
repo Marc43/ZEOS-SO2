@@ -8,11 +8,12 @@
 #include <io.h>
 
 #include <zeos_interrupt.h>
-#include <global_vars.h>
 #include <entry.h>
 
 Gate idt[IDT_ENTRIES];
 Register    idtR;
+unsigned long int zeos_ticks = 0;
+
 
 char char_map[] =
 {
@@ -105,8 +106,9 @@ int read_keyboard(unsigned char* letter) {
 	else return -1;
 	
 }
+
 void clock_routine (){
-	++zeos_ticks; //Ticks de reloj
+	zeos_ticks++; //Ticks de reloj
  	zeos_show_clock();
 }
 

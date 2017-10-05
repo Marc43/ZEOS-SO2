@@ -4,8 +4,7 @@
 
 #include <asm.h>
 #include <segment.h>
-
-#define ENOSYS 38
+#include <errno.h>
 
 /**************************************************/
 /**** Save & Restore ******************************/
