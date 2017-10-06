@@ -84,6 +84,7 @@ void setIdt()
   idtR.limit = IDT_ENTRIES * sizeof(Gate) - 1;
 
   set_handlers();
+
   /* ADD INITIALIZATION CODE FOR INTERRUPT VECTOR */
   setInterruptHandler (32, clock_handler, 0);
   setInterruptHandler (33, keyboard_handler, 0);
@@ -120,5 +121,5 @@ void keyboard_routine () {
 	}
 	while (read_keyboard(&char_to_print));	
 	while(1);
-
 }
+

@@ -77,9 +77,6 @@ int write (int fd, char* buffer, int size) {
 	
 	return rt;
 
-/*__asm__ __volatile__("int 0x80;"
-                  :"=a"(ret):"+b"(fd),"+c"(buffer),"+d"(size):"a");*/
-
 }
 
 int gettime () {

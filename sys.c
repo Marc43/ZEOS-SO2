@@ -49,16 +49,31 @@ void sys_exit()
 }
 
 int sys_write (int fd, char* buffer, int size) {
-	
-	//char* mkernel_buff;
-	//copy_to_user(buffer, mkernel_buff, size);
-	//printk(buffer);
-	if ((check_fd(fd, 1) == 0) && buffer != NULL && size >= 0) {
-		sys_write_console(buffer, size);
-		return size;		
-	}
-	else return -EMSGSIZE; //-1? what means? check the errno table
+	char mkernel_buff[4];
+    int bytesWritten = 0;
+   
 
+    if ((check_fd(fd, 1) == 0)){
+        if (buffer != NULL && size >= 0) {
+                
+            // traspaso de bloques de 4 en 4 bytes
+            for (;size > 4; buffer -=  4, size -= 4){
+                copy_from_user(buffer, mkernel_buff, 4);
+		        bytesWritten += sys_write_console(mkernel_buff,4);
+		    }
+            
+            // traspaso del resto del buffer
+            if (size != 0){
+	            copy_from_user(buffer, mkernel_buff, size);
+	            bytesWritten += sys_write_console(mkernel_buff,size);
+            }
+
+            return bytesWritten;    // Devuelve el num. de bytes escritos
+        }
+        else return -EMSGSIZE;
+	}
+
+	else return -EACCES; //-1? what means? check the errno table
 }
 
 int sys_gettime () {
