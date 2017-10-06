@@ -62,20 +62,22 @@ int strlen(char *a)
 }
 
 int write (int fd, char* buffer, int size) {
-	int ret;
-	__asm__ __volatile__("movl 8(%%ebp), %%ebx;" 
-						"movl 12(%%ebp), %%ecx;"
-						"movl 16(%%ebp), %%edx;" 
-       					"movl $0x04, %%eax;" 
+	int rt;
+	__asm__ __volatile__("movl 8(%ebp), %ebx;" 
+						"movl 12(%ebp), %ecx;"
+						"movl 16(%ebp), %edx;" 
+       					"movl $0x04, %eax;" 
 						"int $0x80;"
-						"movl %%ebp, %%esp;"
-						"popl %%ebp;"
-						"ret;"
-						:"=a" ( ret ) ::);
+					    "movl %eax, -4(%ebp);" 
+						);
 
-	if (ret < 0) {errno = ret; return -1;}
-
-	return ret;
+	if (rt < 0) {
+		int errno = rt;	
+	}
+	
+	__asm__ __volatile__("movl %ebp, %esp;"
+						 "popl %ebp;"
+						 "ret;");
 
 /*__asm__ __volatile__("int 0x80;"
                   :"=a"(ret):"+b"(fd),"+c"(buffer),"+d"(size):"a");*/
@@ -86,12 +88,12 @@ int gettime () {
 	unsigned long int ret;
 	__asm__ __volatile__("movl $10, %%eax;"
 						"int $0x80;"
-						"movl %%ebp, %%esp;"
-						"popl %%ebp;"
-						"ret;"
 						:"=a" ( ret ) ::);
 
-	if (ret < 0) {errno = ret; return -1;}	
+	if (ret < 0) {
+		errno = ret;
+		return -1;
+	}	
 	
 	return ret;
 }
