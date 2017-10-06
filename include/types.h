@@ -151,6 +151,6 @@ typedef union
   } bits;
 } page_table_entry;
 
-extern unsigned long int zeos_ticks;
+unsigned long int zeos_ticks;
 
 #endif  /* __TYPES_H__ */

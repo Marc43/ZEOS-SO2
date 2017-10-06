@@ -8,8 +8,6 @@
 
 #include <stats.h>
 
-extern int errno;
-
 void perror ();
 
 int write (int fd, char *buffer, int size);

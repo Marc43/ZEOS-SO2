@@ -55,11 +55,10 @@ int sys_write (int fd, char* buffer, int size) {
 	//printk(buffer);
 	if ((check_fd(fd, 1) == 0) && buffer != NULL && size >= 0) {
 		sys_write_console(buffer, size);
-		return 0;		
+		return size;		
 	}
 	else return -EMSGSIZE; //-1? what means? check the errno table
 
-	return 0;
 }
 
 int sys_gettime () {

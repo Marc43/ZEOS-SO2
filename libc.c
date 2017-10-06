@@ -6,6 +6,8 @@
 
 #include <types.h>
 
+#include <errno.h>
+
 int errno = 0;
 
 void perror() {
@@ -15,7 +17,7 @@ void perror() {
 	  
 	if (errno < 0) {
 	
-         if (errno == -38) {
+         if (errno == -EMSGSIZE) {
              char aux [128] = "Function not implemented in ZeOS...";
         	 msg = &aux [0];
 		}
@@ -62,7 +64,7 @@ int strlen(char *a)
 }
 
 int write (int fd, char* buffer, int size) {
-	int rt;
+	int rt = 0;
 	__asm__ __volatile__("movl 8(%ebp), %ebx;" 
 						"movl 12(%ebp), %ecx;"
 						"movl 16(%ebp), %edx;" 
@@ -71,13 +73,9 @@ int write (int fd, char* buffer, int size) {
 					    "movl %eax, -4(%ebp);" 
 						);
 
-	if (rt < 0) {
-		int errno = rt;	
-	}
+	if (rt < 0) {errno = rt; return -1;}	
 	
-	__asm__ __volatile__("movl %ebp, %esp;"
-						 "popl %ebp;"
-						 "ret;");
+	return rt;
 
 /*__asm__ __volatile__("int 0x80;"
                   :"=a"(ret):"+b"(fd),"+c"(buffer),"+d"(size):"a");*/
@@ -85,10 +83,10 @@ int write (int fd, char* buffer, int size) {
 }
 
 int gettime () {
-	unsigned long int ret;
-	__asm__ __volatile__("movl $10, %%eax;"
+	unsigned long int ret = 0;
+	__asm__ __volatile__("movl $10, %eax;"
 						"int $0x80;"
-						:"=a" ( ret ) ::);
+						"mov %eax, -4(%ebp);");
 
 	if (ret < 0) {
 		errno = ret;
