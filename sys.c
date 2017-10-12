@@ -51,7 +51,19 @@ void sys_exit()
 int sys_write (int fd, char* buffer, int size) {
 	char mkernel_buff[4];
     int bytesWritten = 0;
-   
+/*
+	if (check_fd (fd, 1) != 0) {
+
+	}
+
+	if (buffer == NULL) {
+
+	}
+
+	if (size < 0) {
+
+	} Falta meterle los ERRNO y quitar lo de abajo...*/
+	   
 
     if ((check_fd(fd, 1) == 0)){
         if (buffer != NULL && size >= 0) {
