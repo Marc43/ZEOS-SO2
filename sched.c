@@ -84,3 +84,20 @@ struct task_struct* current()
   return (struct task_struct*)(ret_value&0xfffff000);
 }
 
+/* Free && Ready queues functions */
+
+void init_free_queue () {
+	INIT_LIST_HEAD ( &freequeue );
+	
+	int i;
+	for (i=0; i < NR_TASKS; ++i) {
+		struct task_list_element fe;
+		fe.task_ = task [i];		 
+		list_add_tail (&(fe.anchor), &freequeue);
+	}	
+}
+
+void init_ready_queue () {
+	//Empty at the beggining
+	INIT_LIST_HEAD ( &readyqueue );
+}

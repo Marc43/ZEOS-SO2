@@ -58,4 +58,18 @@ void update_process_state_rr(struct task_struct *t, struct list_head *dest);
 int needs_sched_rr();
 void update_sched_data_rr();
 
+/* Init free && ready queue */
+
+struct list_head freequeue;
+struct task_list_element {
+	union task_union *task_;
+	struct list_head anchor;
+};
+void init_free_queue();
+
+struct list_head readyqueue;
+
+
+void init_ready_queue();
+
 #endif  /* __SCHED_H__ */
