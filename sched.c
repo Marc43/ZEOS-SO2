@@ -24,6 +24,13 @@ struct task_struct *list_head_to_task_struct(struct list_head *l)
 
 extern struct list_head blocked;
 
+struct list_head freequeue;
+struct task_list_element {
+    union task_union *task_;
+    struct list_head anchor;
+};
+
+struct list_head readyqueue;
 
 /* get_DIR - Returns the Page Directory address for task 't' */
 page_table_entry * get_DIR (struct task_struct *t) 
@@ -90,11 +97,8 @@ void init_free_queue () {
 	INIT_LIST_HEAD ( &freequeue );
 	
 	int i;
-	for (i=0; i < NR_TASKS; ++i) {
-		struct task_list_element fe;
-		fe.task_ = task [i];		 
-		list_add_tail (&(fe.anchor), &freequeue);
-	}	
+	for (i=0; i < NR_TASKS; ++i) list_add_tail (&(task[i].task.anchor), &freequeue);
+		
 }
 
 void init_ready_queue () {
