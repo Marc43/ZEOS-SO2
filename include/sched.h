@@ -17,12 +17,13 @@ enum state_t { ST_RUN, ST_READY, ST_BLOCKED };
 struct task_struct {
   int PID;			/* Process ID. This MUST be the first field of the struct. */
   page_table_entry * dir_pages_baseAddr;
-  struct list_head   anchor; 
+  unsigned int kernel_esp; //To undo the dynamic link and some black magic
+  struct list_head list; 
 };
 
 union task_union {
   struct task_struct task;
-  unsigned long stack[KERNEL_STACK_SIZE];    /* pila de sistema, per procés */
+  unsigned long stack[KERNEL_STACK_SIZE]; //Stack system per process 
 };
 
 extern union task_union protected_tasks[NR_TASKS+2];

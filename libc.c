@@ -12,7 +12,7 @@ int errno = 0;
 
 void perror() {
 	char* msg;
-	char string [128] = "Seems like all has gone nice! (Or not, but I don't care)...";
+	char string [128] = "Seems like";
 	msg = &string[0];	
 	  
 	if (errno < 0) {

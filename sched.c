@@ -15,22 +15,16 @@ union task_union protected_tasks[NR_TASKS+2]
 
 union task_union *task = &protected_tasks[1]; /* == union task_union task[NR_TASKS] */
 
-#if 0
 struct task_struct *list_head_to_task_struct(struct list_head *l)
 {
   return list_entry( l, struct task_struct, list);
 }
-#endif
 
 extern struct list_head blocked;
 
-struct list_head freequeue;
-struct task_list_element {
-    union task_union *task_;
-    struct list_head anchor;
-};
-
-struct list_head readyqueue;
+struct list_head freequeue; 	//We put there the structs just for code style
+								//As they are only used in this .c we don't put the extern
+struct list_head readyqueue;	//Before the type, i.e extern struct list_head blocked;
 
 /* get_DIR - Returns the Page Directory address for task 't' */
 page_table_entry * get_DIR (struct task_struct *t) 
@@ -66,13 +60,27 @@ void cpu_idle(void)
 	}
 }
 
-void init_idle (void)
-{
-
+void init_idle (void) {
+	//Here we initialize the idle process
+	
+	if (!list_empty(&freequeue)) { //Free processes available
+		struct list_head * lh = list_first (&freequeue);
+		list_del(lh);	
+		
+		struct task_struct* idle = list_head_to_task_struct(lh);
+		//Now the 'idle' points to our free PCB
+		idle->PID = 0;
+		idle->dir_pages_baseAddr = allocate_DIR(idle);
+		//Now the process has the PID 0, and a number of Page Directory assigned
+		//idle->kernel_esp = ; //Which initial value?
+		struct task_struct*	idle_task = idle; //struct task_struct* idle_task = idle;
+	}
+	//else (Doesn't make sense, there will be free PCB's always...)
 }
 
-void init_task1(void)
-{
+void init_task1(void) {
+	
+
 }
 
 
@@ -97,7 +105,7 @@ void init_free_queue () {
 	INIT_LIST_HEAD ( &freequeue );
 	
 	int i;
-	for (i=0; i < NR_TASKS; ++i) list_add_tail (&(task[i].task.anchor), &freequeue);
+	for (i=0; i < NR_TASKS; ++i) list_add_tail (&(task[i].task.list), &freequeue);
 		
 }
 
