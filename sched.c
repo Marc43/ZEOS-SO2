@@ -79,8 +79,16 @@ void init_idle (void) {
 }
 
 void init_task1(void) {
-	
+	struct list_head* lh = list_first (&freequeue);
+	list_del(lh); 	
 
+	struct task_struct* task1 = list_head_to_task_struct(lh);
+	task1->PID = 1;
+	task1->dir_pages_baseAddr = allocate_DIR(task1);
+	set_user_pages(task1); //Initialize pages for task1
+	set_cr3(task1->dir_pages_baseAddr);
+	tss.esp0 = task[task1->PID].stack[0];	
+	task1->kernel_esp = tss.esp0; //At the start, they point to the same memory position
 }
 
 
