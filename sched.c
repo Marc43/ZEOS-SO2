@@ -87,7 +87,7 @@ void init_task1(void) {
 	task1->dir_pages_baseAddr = allocate_DIR(task1);
 	set_user_pages(task1); //Initialize pages for task1
 	set_cr3(task1->dir_pages_baseAddr);
-	tss.esp0 = task[task1->PID].stack[0];	
+	tss.esp0 = task[task1->PID].stack[1023];	
 	task1->kernel_esp = tss.esp0; //At the start, they point to the same memory position
 }
 
@@ -120,4 +120,31 @@ void init_free_queue () {
 void init_ready_queue () {
 	//Empty at the beggining
 	INIT_LIST_HEAD ( &readyqueue );
+}
+
+void task_switch (union task_union* t) {
+	__asm__ __volatile__ ( "pushl %%esi;"
+						   "pushl %%edi;"
+						   "pushl %%ebx;"
+						   "movl %0, %%ebx;"
+						   :: "m" (t)
+						   : "%eax", "%ebx");
+	inner_task_switch(t);
+	__asm__ __volatile__ (	"popl %ebx;"
+						    "popl %edi;"
+							"popl %esi;");
+
+}
+
+void inner_task_switch (union task_union* t) {
+	tss.esp0 = task[t->task.PID].stack[1023]; //Update the TSS...
+	set_cr3 (t->task.dir_pages_baseAddr);
+	unsigned int new_esp = t->task.kernel_esp;
+	__asm__ __volatile__ (  "pushl %%ebp;"
+						    "movl %0, %%esp;"
+							"popl %%ebp;"
+							:: "m" (new_esp)
+							:);
+	//RET call missing... But... something is weird
+
 }

@@ -83,7 +83,7 @@ int write (int fd, char* buffer, int size) {
                           : "=m" (rt) 
 						  : "m" (fd), "m" (buffer), "m" (size) 
 						  : "%eax", "%ebx", "%ecx", "%edx");
-
+	//poner de input ebx, ecx i edx con fd, buffer y size respectivament...
 	if (rt < 0) {errno = rt; return -1;}	
 	
 	return rt;
