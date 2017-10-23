@@ -123,12 +123,9 @@ void init_ready_queue () {
 }
 
 void task_switch (union task_union* t) {
-	__asm__ __volatile__ ( "pushl %%esi;"
-						   "pushl %%edi;"
-						   "pushl %%ebx;"
-						   "movl %0, %%ebx;"
-						   :: "m" (t)
-						   : "%eax", "%ebx");
+	__asm__ __volatile__ ( "pushl %esi;"
+						   "pushl %edi;"
+						   "pushl %ebx;");
 	inner_task_switch(t);
 	__asm__ __volatile__ (	"popl %ebx;"
 						    "popl %edi;"
@@ -136,15 +133,16 @@ void task_switch (union task_union* t) {
 
 }
 
-void inner_task_switch (union task_union* t) {
+void inner_task_switch (union task_union* t) {	
+	unsigned int old_esp = current()->kernel_esp;
 	tss.esp0 = task[t->task.PID].stack[1023]; //Update the TSS...
-	set_cr3 (t->task.dir_pages_baseAddr);
-	unsigned int new_esp = t->task.kernel_esp;
-	__asm__ __volatile__ (  "pushl %%ebp;"
+	set_cr3 (t->task.dir_pages_baseAddr); //Set the new page directory (intel will erase TLB)
+	unsigned int new_esp = t->task.kernel_esp; //The new_esp will be pointing straight to kernel_esp
+	__asm__ __volatile__ ( 	"movl %%ebp, %1;" 
 						    "movl %0, %%esp;"
 							"popl %%ebp;"
-							:: "m" (new_esp)
+							"ret"
+							:: "m" (new_esp), "m" (old_esp)
 							:);
-	//RET call missing... But... something is weird
 
 }
