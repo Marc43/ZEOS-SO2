@@ -14,6 +14,7 @@ union task_union protected_tasks[NR_TASKS+2]
   __attribute__((__section__(".data.task")));
 
 union task_union *task = &protected_tasks[1]; /* == union task_union task[NR_TASKS] */
+struct task_struct*	idle_task ;
 
 struct task_struct *list_head_to_task_struct(struct list_head *l)
 {
@@ -52,8 +53,8 @@ int allocate_DIR(struct task_struct *t)
 
 void cpu_idle(void)
 {
-	__asm__ __volatile__("sti": : :"memory");
-
+	//__asm__ __volatile__("sti": : :"memory");
+	printk("Hola");	
 	while(1)
 	{
 	;
@@ -64,31 +65,32 @@ void init_idle (void) {
 	//Here we initialize the idle process
 	
 	if (!list_empty(&freequeue)) { //Free processes available
-		struct list_head * lh = list_first (&freequeue);
+		struct list_head* lh = list_first (&freequeue);
 		list_del(lh);	
 		
 		struct task_struct* idle = list_head_to_task_struct(lh);
 		//Now the 'idle' points to our free PCB
 		idle->PID = 0;
-		idle->dir_pages_baseAddr = allocate_DIR(idle);
+		allocate_DIR(idle);
 		//Now the process has the PID 0, and a number of Page Directory assigned
 		//idle->kernel_esp = ; //Which initial value?
-		struct task_struct*	idle_task = idle; //struct task_struct* idle_task = idle;
+		idle_task = idle; //struct task_struct* idle_task = idle;
 	}
 	//else (Doesn't make sense, there will be free PCB's always...)
 }
 
 void init_task1(void) {
-	struct list_head* lh = list_first (&freequeue);
-	list_del(lh); 	
-
-	struct task_struct* task1 = list_head_to_task_struct(lh);
-	task1->PID = 1;
-	task1->dir_pages_baseAddr = allocate_DIR(task1);
-	set_user_pages(task1); //Initialize pages for task1
-	set_cr3(task1->dir_pages_baseAddr);
-	tss.esp0 = task[task1->PID].stack[1023];	
-	task1->kernel_esp = tss.esp0; //At the start, they point to the same memory position
+	if (!list_empty(&freequeue)) {
+		struct list_head* lh = list_first (&freequeue);
+		list_del(lh); 	
+		struct task_struct* task1 = list_head_to_task_struct(lh);
+		task1->PID = 1;
+		allocate_DIR(task1);
+		set_user_pages(task1); //Initialize pages for task1
+		set_cr3(task1->dir_pages_baseAddr);
+		tss.esp0 = &(task[task1->PID].stack[1023]);	
+		task1->kernel_esp = tss.esp0; //At the start, they point to the same memory position 
+	}
 }
 
 
@@ -134,15 +136,16 @@ void task_switch (union task_union* t) {
 }
 
 void inner_task_switch (union task_union* t) {	
-	unsigned int old_esp = current()->kernel_esp;
-	tss.esp0 = task[t->task.PID].stack[1023]; //Update the TSS...
+//	unsigned int old_esp = current()->kernel_esp;
+	//tss.esp0 = task[t->task.PID].stack[1023]; //Update the TSS...
+	tss.esp0 = &(t->stack[1023]);
 	set_cr3 (t->task.dir_pages_baseAddr); //Set the new page directory (intel will erase TLB)
-	unsigned int new_esp = t->task.kernel_esp; //The new_esp will be pointing straight to kernel_esp
+//	unsigned int new_esp = t->task.kernel_esp; //The new_esp will be pointing straight to kernel_esp
 	__asm__ __volatile__ ( 	"movl %%ebp, %1;" 
 						    "movl %0, %%esp;"
 							"popl %%ebp;"
 							"ret"
-							:: "m" (new_esp), "m" (old_esp)
+							:: "m" (t->task.kernel_esp), "m" (current()->kernel_esp)
 							:);
 
 }

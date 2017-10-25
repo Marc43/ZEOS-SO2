@@ -113,13 +113,14 @@ void clock_routine (){
  	zeos_show_clock();
 }
 
+//extern struct task_struct *idle_task;
 void keyboard_routine () {
   	unsigned char char_to_print = ' ';
 	read_keyboard(&char_to_print);
+//	task_switch(idle_task);
 	do {
 	  printc_xy(0x00, 0x00, char_to_print);
 	}
-	while (read_keyboard(&char_to_print));	
-	while(1);
+	while (read_keyboard(&char_to_print));		
 }
 

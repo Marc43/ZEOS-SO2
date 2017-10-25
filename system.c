@@ -92,7 +92,6 @@ int __attribute__((__section__(".text.main")))
   /* Initialize Free && Ready queues */
   init_free_queue();  
   init_ready_queue();
-
   /* Initialize Scheduling */
   init_sched();
 
