@@ -110,3 +110,16 @@ int gettime () {
 	
 	return ret;
 }
+
+int getpid () {
+	unsigned long int ret = 0;
+	__asm__ __volatile__ ("movl $20, %%eax;"
+						  "int $0x80;"
+						  "movl %%eax, %0;"
+						  : "=m" (ret)
+						  :
+						  : "eax");
+	
+	return ret;
+}
+
