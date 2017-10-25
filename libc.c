@@ -123,3 +123,15 @@ int getpid () {
 	return ret;
 }
 
+int fork () {
+	unsigned long int ret = 0;
+	__asm__ __volatile__ ("movl $2, %%eax;"
+						  "int $0x80;"
+					      "movl %%eax, %0;" //At this point, child and parent will have different return values
+						  : "=m" (ret)
+						  :	
+						  : "eax");
+
+	return ret;
+}
+
