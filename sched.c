@@ -53,8 +53,8 @@ int allocate_DIR(struct task_struct *t)
 
 void cpu_idle(void)
 {
-	//__asm__ __volatile__("sti": : :"memory");
-	printk("Hola");	
+	__asm__ __volatile__("sti": : :"memory");
+	
 	while(1)
 	{
 	;
@@ -72,9 +72,13 @@ void init_idle (void) {
 		//Now the 'idle' points to our free PCB
 		idle->PID = 0;
 		allocate_DIR(idle);
+		union task_union* idle_union = (union task_union*)idle;
 		//Now the process has the PID 0, and a number of Page Directory assigned
 		//idle->kernel_esp = ; //Which initial value?
 		idle_task = idle; //struct task_struct* idle_task = idle;
+		idle_union->stack[KERNEL_STACK_SIZE-1] = (unsigned long)&cpu_idle;
+		idle_union->stack[KERNEL_STACK_SIZE-2] = 0;
+		idle->kernel_esp = &(idle_union->stack [KERNEL_STACK_SIZE - 2]);
 	}
 	//else (Doesn't make sense, there will be free PCB's always...)
 }
@@ -141,11 +145,12 @@ void inner_task_switch (union task_union* t) {
 	tss.esp0 = &(t->stack[1023]);
 	set_cr3 (t->task.dir_pages_baseAddr); //Set the new page directory (intel will erase TLB)
 //	unsigned int new_esp = t->task.kernel_esp; //The new_esp will be pointing straight to kernel_esp
-	__asm__ __volatile__ ( 	"movl %%ebp, %1;" 
-						    "movl %0, %%esp;"
+	__asm__ __volatile__ ( 	"movl %%ebp, %0;" 
+						    "movl %1, %%esp;"
 							"popl %%ebp;"
-							"ret"
-							:: "m" (t->task.kernel_esp), "m" (current()->kernel_esp)
+							"ret;"
+							: "=m" (current()->kernel_esp)
+							: "m" (t->task.kernel_esp)
 							:);
 
 }
