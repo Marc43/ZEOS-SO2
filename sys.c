@@ -65,19 +65,20 @@ int sys_fork()
 		i++;
 	}
 	
-	i = NUM_PAG_KERNEL; //Actually 'i' has that value...	
+	i = NUM_PAG_CODE; //Actually 'i' has that value...	
 	while (i < NUM_PAG_CODE) {
 		unsigned int code_frame_number = get_frame(PT_parent, i);
 		set_ss_pag(PT_child, i, code_frame_number);
 		i++;
 	}
 
+	i = NUM_PAG_DATA; //Actually 'i' has that value...
 	data_frame_number = alloc_frame(); //That pages are for the child
 	while (data_frame_number and i < NUM_PAG_DATA) {
 		set_ss_pag(PT_child, i, data_frame_number);
 		set_ss_pag(PT_parent, i+NUM_PAG_DATA, data_frame_number);		
 
-		/* Note that I am supposing that the parent has nothing after it Data pages */
+		/* Note that I am supposing that the parent has nothing after its own data pages */
 	}
 
 	if (!data_frame_number) {
@@ -85,11 +86,30 @@ int sys_fork()
 		printk("Insert an error code! No more Physical Pages left!");
 	}
 	else { //Do the copy
-		copy_data(PT_parent[NUM_PAG_DATA], PT_parent[2*NUM_PAG_DATA], NUM_PAG_DATA*sizeof(unsigned long));
+		copy_data(PT_parent[NUM_PAG_DATA].bits.pbase_addr, PT_parent[2*NUM_PAG_DATA].bits.pbase_addr, NUM_PAG_DATA*sizeof(unsigned long));
+		//And erase the entries from parent PT!!!
+		
+		for (i = 2*NUM_PAG_DATA; i < 3*NUM_PAG_DATA; i++) {
+			del_ss_pag(PT_parent, i);
+		}
+
 	}	
 	
-	
+	//Give a free PID (which??)
 
+	//Task variables != Parent, modify them
+	// -kernel_esp
+	// -the Directory is modified at the start of the fork...
+
+	//Registers that may be different?
+	// -esp0
+	// -esp
+	// -ebp
+	
+	//Push eip and ebp (dynamic link)
+	//probably they are already made by the parent process
+
+	/* Once we do the following return, we will have to restore the hardware context, and continue the execution of the user process (the one who created us) by using 'ret_from_fork' what will be a task_switch to our parent, or something like that, insert the child process in the ready queue*/
 
 	return PID;
 }
