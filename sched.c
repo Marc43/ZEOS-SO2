@@ -23,10 +23,6 @@ struct task_struct *list_head_to_task_struct(struct list_head *l)
 
 extern struct list_head blocked;
 
-struct list_head freequeue; 	//We put there the structs just for code style
-								//As they are only used in this .c we don't put the extern
-struct list_head readyqueue;	//Before the type, i.e extern struct list_head blocked;
-
 /* get_DIR - Returns the Page Directory address for task 't' */
 page_table_entry * get_DIR (struct task_struct *t) 
 {

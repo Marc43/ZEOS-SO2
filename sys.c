@@ -18,6 +18,8 @@
 #define LECTURA 0
 #define ESCRIPTURA 1
 
+extern struct list_head freequeue;
+
 int check_fd(int fd, int permissions)
 {
   if (fd!=1) return -9; /*EBADF*/
@@ -39,24 +41,29 @@ int sys_fork()
 {
   int PID=-1;
   // creates the child process
-  	if (!list_empty(&freequeue)) {
+  	union task_union* child_union;
+	union task_union* parent_union;
+
+	if (!list_empty(&freequeue)) {
 		struct list_head* lh = list_first (&freequeue);
 		list_del(lh);
 
 		struct task_struct* child = list_head_to_task_struct(lh);
-		union task_union* child_union = (union task_union*)child;
-		union task_union* parent_union = current();
+		child_union = (union task_union*)child;
+
+		struct task_struct* parent = current();
+		parent_union = (union task_union*)parent;
 		//The size of the union is the max(task_struct, stack)	
-		copy_from_user(parent_union, child_union, KERNEL_STACK_SIZE*sizeof(unsigned long));
-		allocate_DIR(child_union->task); //Does not contemplate any error...
+		copy_from_user(&parent_union, &child_union, KERNEL_STACK_SIZE*sizeof(unsigned long));
+		allocate_DIR(&(child_union->task)); //Does not contemplate any error...
 	} 
   	else {
 		printk("Insert an error code, that means there are no more pcb's");
 	}
 	
 	int i = 0;
-	page_table_entry* PT_child = get_PT(child_union->task);
-	page_table_entry* PT_parent = get_PT(parent_union->task);
+	page_table_entry* PT_child = get_PT(&(child_union->task));
+	page_table_entry* PT_parent = get_PT(&(parent_union->task));
 
 	while (i < NUM_PAG_KERNEL) {
 		unsigned int kernel_frame_number = get_frame(PT_parent, i);
@@ -73,8 +80,8 @@ int sys_fork()
 	}
 
 	i = NUM_PAG_DATA; //Actually 'i' has that value...
-	data_frame_number = alloc_frame(); //That pages are for the child
-	while (data_frame_number and i < NUM_PAG_DATA) {
+	int data_frame_number = alloc_frame(); //That pages are for the child
+	while (data_frame_number && i < NUM_PAG_DATA) {
 		set_ss_pag(PT_child, i, data_frame_number);
 		set_ss_pag(PT_parent, i+NUM_PAG_DATA, data_frame_number);		
 
