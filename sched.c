@@ -10,6 +10,9 @@
  * Container for the Task array and 2 additional pages (the first and the last one)
  * to protect against out of bound accesses.
  */
+
+unsigned long last_PID = 0;
+
 union task_union protected_tasks[NR_TASKS+2]
   __attribute__((__section__(".data.task")));
 
@@ -66,7 +69,7 @@ void init_idle (void) {
 		
 		struct task_struct* idle = list_head_to_task_struct(lh);
 		//Now the 'idle' points to our free PCB
-		idle->PID = 0;
+		idle->PID = last_PID++;
 		allocate_DIR(idle);
 		union task_union* idle_union = (union task_union*)idle;
 		//Now the process has the PID 0, and a number of Page Directory assigned
@@ -84,7 +87,7 @@ void init_task1(void) {
 		struct list_head* lh = list_first (&freequeue);
 		list_del(lh); 	
 		struct task_struct* task1 = list_head_to_task_struct(lh);
-		task1->PID = 1;
+		task1->PID = last_PID++;
 		allocate_DIR(task1);
 		set_user_pages(task1); //Initialize pages for task1
 		set_cr3(task1->dir_pages_baseAddr);

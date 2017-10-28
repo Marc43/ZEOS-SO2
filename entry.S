@@ -101,5 +101,7 @@ fin:
 	RESTORE_ALL
 	iret //Return from kernel privilege level...
 
-
-	
+ENTRY (ret_from_fork)
+	//movl PID, 0x18(esp)
+	RESTORE_ALL
+	iret;	

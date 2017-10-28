@@ -19,6 +19,7 @@
 #define ESCRIPTURA 1
 
 extern struct list_head freequeue;
+extern unsigned long last_PID;
 
 int check_fd(int fd, int permissions)
 {
@@ -39,8 +40,19 @@ int sys_getpid()
 
 int sys_fork()
 {
-  int PID=-1;
-  // creates the child process
+
+	//We duplicate the dynamic link in local variables
+	unsigned long ebp_p, eip_p;
+	__asm__ __volatile__ ("movl 0(%%ebp), %%eax;"
+						  "movl 4(%%ebp), %%ebx;"
+						  "movl %%eax, %0;"
+						  "movl %%ebx, %1;"
+						  :"=m" (ebp_p), "=m" (eip_p):
+						  : "%eax", "%ebx");
+	//I move them to vars at the start just to ensure
+
+  	int PID=-1;
+  	// creates the child process
   	union task_union* child_union;
 	union task_union* parent_union;
 
@@ -53,15 +65,34 @@ int sys_fork()
 
 		struct task_struct* parent = current();
 		parent_union = (union task_union*)parent;
+
 		//The size of the union is the max(task_struct, stack)	
-		copy_from_user(&parent_union, &child_union, KERNEL_STACK_SIZE*sizeof(unsigned long));
+		copy_data(parent_union, child_union, sizeof(union task_union));
+
 		allocate_DIR(&(child_union->task)); //Does not contemplate any error...
 	} 
   	else {
 		printk("Insert an error code, that means there are no more pcb's");
+		return -ECHILD;	
 	}
-	
+
+	//Search for physical pages
 	int i = 0;
+	int frame = alloc_frame();	
+	unsigned int ph_pages [NUM_PAG_DATA];
+	
+	while (frame && i < NUM_PAG_DATA) {
+		ph_pages [i] = frame;
+		frame = alloc_frame();
+		i++;		
+	}
+
+	if (!frame) {
+		printk("Insert an error code, no more physical pages available");
+		return -ENOMEM;
+	}
+
+	i = 0;
 	page_table_entry* PT_child = get_PT(&(child_union->task));
 	page_table_entry* PT_parent = get_PT(&(parent_union->task));
 
@@ -72,28 +103,33 @@ int sys_fork()
 		i++;
 	}
 	
-	i = NUM_PAG_CODE; //Actually 'i' has that value...	
-	while (i < NUM_PAG_CODE) {
+	i = NUM_PAG_KERNEL;	
+	while (i < NUM_PAG_KERNEL + NUM_PAG_CODE) {
 		unsigned int code_frame_number = get_frame(PT_parent, i);
 		set_ss_pag(PT_child, i, code_frame_number);
 		i++;
 	}
 
-	i = NUM_PAG_DATA; //Actually 'i' has that value...
-	int data_frame_number = alloc_frame(); //That pages are for the child
-	while (data_frame_number && i < NUM_PAG_DATA) {
+	i = NUM_PAG_KERNEL + NUM_PAG_CODE;
+	int j = 0;
+	int data_frame_number = ph_pages [j];
+	while (data_frame_number && (i < NUM_PAG_KERNEL + NUM_PAG_CODE + NUM_PAG_DATA && j < NUM_PAG_DATA)) {
 		set_ss_pag(PT_child, i, data_frame_number);
 		set_ss_pag(PT_parent, i+NUM_PAG_DATA, data_frame_number);		
-
+		++i; ++j;
+		data_frame_number = ph_pages [j];
 		/* Note that I am supposing that the parent has nothing after its own data pages */
 	}
 
 	if (!data_frame_number) {
 		//That means that no PH frames are left, remember to requeue the PCB we took from the freequeue
 		printk("Insert an error code! No more Physical Pages left!");
+		return -ENOMEM;
 	}
 	else { //Do the copy
-		copy_data(PT_parent[NUM_PAG_DATA].bits.pbase_addr, PT_parent[2*NUM_PAG_DATA].bits.pbase_addr, NUM_PAG_DATA*sizeof(unsigned long));
+		i = NUM_PAG_KERNEL + NUM_PAG_CODE;
+		copy_data(PT_parent[i].bits.pbase_addr, PT_parent[i + NUM_PAG_DATA].bits.pbase_addr, NUM_PAG_DATA*4096);	
+		//copy_data((void*)PT_parent[NUM_PAG_DATA].bits.pbase_addr, (void*)PT_parent[2*NUM_PAG_DATA].bits.pbase_addr, NUM_PAG_DATA*sizeof(unsigned long));
 		//And erase the entries from parent PT!!!
 		
 		for (i = 2*NUM_PAG_DATA; i < 3*NUM_PAG_DATA; i++) {
@@ -101,22 +137,20 @@ int sys_fork()
 		}
 
 	}	
+
+	PID = last_PID++;	
+	child_union->task.PID = PID;
+
+	set_cr3(child_union->task.dir_pages_baseAddr);	
 	
-	//Give a free PID (which??)
+	//Push eip and ebp (extra dynamic link)
+	__asm__ __volatile__ ("movl %%esp, %0;"
+						  "push %%ebx;"
+						  "push %%eax;"
+						  :"=m" (child_union->task.kernel_esp)
+						  :"a" (ebp_p), "b" (eip_p));
 
-	//Task variables != Parent, modify them
-	// -kernel_esp
-	// -the Directory is modified at the start of the fork...
-
-	//Registers that may be different?
-	// -esp0
-	// -esp
-	// -ebp
-	
-	//Push eip and ebp (dynamic link)
-	//probably they are already made by the parent process
-
-	/* Once we do the following return, we will have to restore the hardware context, and continue the execution of the user process (the one who created us) by using 'ret_from_fork' what will be a task_switch to our parent, or something like that, insert the child process in the ready queue*/
+	list_add_tail(&(child_union->task.list), &readyqueue);
 
 	return PID;
 }
