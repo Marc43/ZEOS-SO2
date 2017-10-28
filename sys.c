@@ -132,7 +132,7 @@ int sys_fork()
 		//copy_data((void*)PT_parent[NUM_PAG_DATA].bits.pbase_addr, (void*)PT_parent[2*NUM_PAG_DATA].bits.pbase_addr, NUM_PAG_DATA*sizeof(unsigned long));
 		//And erase the entries from parent PT!!!
 		
-		for (i = 2*NUM_PAG_DATA; i < 3*NUM_PAG_DATA; i++) {
+		for (i = NUM_PAG_KERNEL + NUM_PAG_CODE + NUM_PAG_DATA; i < NUM_PAG_KERNEL + NUM_PAG_CODE + 2*NUM_PAG_DATA; i++) {
 			del_ss_pag(PT_parent, i);
 		}
 
