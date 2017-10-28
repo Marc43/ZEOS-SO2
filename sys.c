@@ -15,6 +15,8 @@
 
 #include <errno.h>
 
+#include <entry.h> //Better extern ret_from_fork() ?
+
 #define LECTURA 0
 #define ESCRIPTURA 1
 
@@ -43,12 +45,12 @@ int sys_fork()
 
 	//We duplicate the dynamic link in local variables
 	unsigned long ebp_p, eip_p;
+	eip_p = (unsigned long)(&ret_from_fork);
 	__asm__ __volatile__ ("movl 0(%%ebp), %%eax;"
-						  "movl 4(%%ebp), %%ebx;"
 						  "movl %%eax, %0;"
-						  "movl %%ebx, %1;"
-						  :"=m" (ebp_p), "=m" (eip_p):
-						  : "%eax", "%ebx");
+						  :"=m" (ebp_p)
+						  :
+						  : "%eax");
 	//I move them to vars at the start just to ensure
 
   	int PID=-1;
@@ -87,7 +89,7 @@ int sys_fork()
 		i++;		
 	}
 
-	if (!frame) {
+	if (frame < 0) {
 		printk("Insert an error code, no more physical pages available");
 		return -ENOMEM;
 	}
@@ -121,12 +123,13 @@ int sys_fork()
 		/* Note that I am supposing that the parent has nothing after its own data pages */
 	}
 
-	if (!data_frame_number) {
+	if (data_frame_number < 0) {
 		//That means that no PH frames are left, remember to requeue the PCB we took from the freequeue
 		printk("Insert an error code! No more Physical Pages left!");
 		return -ENOMEM;
 	}
 	else { //Do the copy
+		printk("Aqui reviento muy facil");
 		i = NUM_PAG_KERNEL + NUM_PAG_CODE;
 		copy_data(PT_parent[i].bits.pbase_addr, PT_parent[i + NUM_PAG_DATA].bits.pbase_addr, NUM_PAG_DATA*4096);	
 		//copy_data((void*)PT_parent[NUM_PAG_DATA].bits.pbase_addr, (void*)PT_parent[2*NUM_PAG_DATA].bits.pbase_addr, NUM_PAG_DATA*sizeof(unsigned long));

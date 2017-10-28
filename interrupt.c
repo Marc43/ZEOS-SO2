@@ -118,6 +118,14 @@ void keyboard_routine () {
   	unsigned char char_to_print = ' ';
 	read_keyboard(&char_to_print);
 	printc_xy(0x00, 0x00, char_to_print);
+	
+	if (!list_empty(&readyqueue)) {
+		struct list_head* lh = list_first (&readyqueue);
+		list_del(lh);
+
+		struct task_struct* to_switch = list_head_to_task_struct(lh);
+		task_switch (to_switch);
+	}	
 /*	do {
 	  printc_xy(0x00, 0x00, char_to_print);
 	}

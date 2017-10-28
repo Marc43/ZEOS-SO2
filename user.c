@@ -10,9 +10,19 @@ int __attribute__ ((__section__(".text.main")))
     /* Next line, tries to move value 0 to CR3 register. This register is a privileged one, and so it will raise an exception */
      /* __asm__ __volatile__ ("mov %0, %%cr3"::"r" (0) ); */
 	
- 	while(1) {
-		//int main_pid = getpid();
-		fork();
+	fork();	
+	/*int k = fork();
+	char* verifica = "COn esta var verifico si es hijo o padre con gdb";
+	if (k == 0) {
+		verifica = "hijito mio";
 	}
+	else verifica = "el diablo";*/
+
+
+
+/* 	while(1) {
+		//int main_pid = getpid();
+		//fork();
+	}*/
 	
 }
