@@ -83,7 +83,7 @@ int sys_fork()
 	int frame = alloc_frame();	
 	unsigned int ph_pages [NUM_PAG_DATA];
 	
-	while (frame && i < NUM_PAG_DATA) {
+	while (frame < 0 && i < NUM_PAG_DATA) {
 		ph_pages [i] = frame;
 		frame = alloc_frame();
 		i++;		
@@ -115,7 +115,7 @@ int sys_fork()
 	i = NUM_PAG_KERNEL + NUM_PAG_CODE;
 	int j = 0;
 	int data_frame_number = ph_pages [j];
-	while (data_frame_number && (i < NUM_PAG_KERNEL + NUM_PAG_CODE + NUM_PAG_DATA && j < NUM_PAG_DATA)) {
+	while (data_frame_number < 0 && (i < NUM_PAG_KERNEL + NUM_PAG_CODE + NUM_PAG_DATA && j < NUM_PAG_DATA)) {
 		set_ss_pag(PT_child, i, data_frame_number);
 		set_ss_pag(PT_parent, i+NUM_PAG_DATA, data_frame_number);		
 		++i; ++j;
@@ -130,11 +130,9 @@ int sys_fork()
 	}
 	else { //Do the copy
 		printk("Aqui reviento muy facil");
-		i = NUM_PAG_KERNEL + NUM_PAG_CODE;
-		copy_data(PT_parent[i].bits.pbase_addr, PT_parent[i + NUM_PAG_DATA].bits.pbase_addr, NUM_PAG_DATA*4096);	
-		//copy_data((void*)PT_parent[NUM_PAG_DATA].bits.pbase_addr, (void*)PT_parent[2*NUM_PAG_DATA].bits.pbase_addr, NUM_PAG_DATA*sizeof(unsigned long));
-		//And erase the entries from parent PT!!!
-		
+		i = L_USER_START + (NUM_PAG_CODE*4096);
+		copy_data((void *)i, (void *)(L_USER_START + (NUM_PAG_CODE+NUM_PAG_DATA)*4096), NUM_PAG_DATA*4096);	
+		//test copy_data(L_USER_START, L_USER_START + 1, 1);
 		for (i = NUM_PAG_KERNEL + NUM_PAG_CODE + NUM_PAG_DATA; i < NUM_PAG_KERNEL + NUM_PAG_CODE + 2*NUM_PAG_DATA; i++) {
 			del_ss_pag(PT_parent, i);
 		}
