@@ -124,7 +124,7 @@ void keyboard_routine () {
 		list_del(lh);
 
 		struct task_struct* to_switch = list_head_to_task_struct(lh);
-		task_switch (to_switch);
+		task_switch ((union task_union*)to_switch);
 	}	
 /*	do {
 	  printc_xy(0x00, 0x00, char_to_print);

@@ -20,9 +20,7 @@ int __attribute__ ((__section__(".text.main")))
 
 
 
-/* 	while(1) {
-		//int main_pid = getpid();
-		//fork();
-	}*/
+ 	while(1) {
+	}
 	
 }

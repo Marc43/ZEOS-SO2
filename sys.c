@@ -43,16 +43,6 @@ int sys_getpid()
 int sys_fork()
 {
 
-	//We duplicate the dynamic link in local variables
-	unsigned long ebp_p, eip_p;
-	eip_p = (unsigned long)(&ret_from_fork);
-	__asm__ __volatile__ ("movl 0(%%ebp), %%eax;"
-						  "movl %%eax, %0;"
-						  :"=m" (ebp_p)
-						  :
-						  : "%eax");
-	//I move them to vars at the start just to ensure
-
   	int PID=-1;
   	// creates the child process
   	union task_union* child_union;
@@ -88,7 +78,7 @@ int sys_fork()
 		frame = alloc_frame();
 		i++;		
 	}
-
+	
 	if (frame < 0) {
 		printk("Insert an error code, no more physical pages available");
 		return -ENOMEM;
@@ -112,45 +102,31 @@ int sys_fork()
 		i++;
 	}
 
-	i = NUM_PAG_KERNEL + NUM_PAG_CODE;
 	int j = 0;
-	int data_frame_number = ph_pages [j];
+	i = (NUM_PAG_KERNEL + NUM_PAG_CODE);
 	
-	while (data_frame_number >= 0 && (i < NUM_PAG_KERNEL + NUM_PAG_CODE + NUM_PAG_DATA && j < NUM_PAG_DATA)) {
+	for (i = NUM_PAG_KERNEL+NUM_PAG_CODE; i < (NUM_PAG_KERNEL+NUM_PAG_CODE+NUM_PAG_DATA); ++i) {
+		int data_frame_number = ph_pages [j];
 		set_ss_pag(PT_child, i, data_frame_number);
-		set_ss_pag(PT_parent, i+NUM_PAG_DATA, data_frame_number);		
-		++i; ++j;
-		data_frame_number = ph_pages [j];
-		/* Note that I am supposing that the parent has nothing after its own data pages */
-	}
-
-	if (data_frame_number < 0) {
-		//That means that no PH frames are left, remember to requeue the PCB we took from the freequeue
-		printk("Insert an error code! No more Physical Pages left!");
-		return -ENOMEM;
-	}
-	else { //Do the copy
-		printk("Aqui reviento muy facil");
-		i = L_USER_START + (NUM_PAG_CODE*PAGE_SIZE);	
+		set_ss_pag(PT_parent, i+NUM_PAG_DATA, data_frame_number);
+		++j;
+	} 
+		
+	i = L_USER_START + (NUM_PAG_CODE*PAGE_SIZE);	
 		copy_data((void *)i, (void *)(L_USER_START) + (NUM_PAG_CODE+NUM_PAG_DATA)*PAGE_SIZE, NUM_PAG_DATA*PAGE_SIZE);	
-		//test copy_data(L_USER_START, L_USER_START + 1, 1);
-		for (i = NUM_PAG_KERNEL + NUM_PAG_CODE + NUM_PAG_DATA; i < NUM_PAG_KERNEL + NUM_PAG_CODE + 2*NUM_PAG_DATA; i++) {
+		
+	for (i = NUM_PAG_KERNEL + NUM_PAG_CODE + NUM_PAG_DATA; i < NUM_PAG_KERNEL + NUM_PAG_CODE + 2*NUM_PAG_DATA; i++) {
 			del_ss_pag(PT_parent, i);
 		}
-
-	}	
-
-	PID = last_PID++;	
+	
 	child_union->task.PID = PID;
 
-	set_cr3(child_union->task.dir_pages_baseAddr);	
+	//Cuenta como flush?
+	set_cr3(parent_union->task.dir_pages_baseAddr);	
 	
-	//Push eip and ebp (extra dynamic link)
-	__asm__ __volatile__ ("movl %%esp, %0;"
-						  "push %%ebx;"
-						  "push %%eax;"
-						  :"=m" (child_union->task.kernel_esp)
-						  :"a" (ebp_p), "b" (eip_p));
+	//'Push'' eip and ebp (extra dynamic link)	
+	child_union->stack[child_union->task.kernel_esp-1] = (unsigned long)&ret_from_fork;
+	child_union->stack[child_union->task.kernel_esp-2] = &(child_union->task.kernel_esp);
 
 	list_add_tail(&(child_union->task.list), &readyqueue);
 
