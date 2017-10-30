@@ -126,7 +126,7 @@ int sys_fork()
 	
 	//'Push'' eip and ebp (extra dynamic link)	
 	child_union->stack[child_union->task.kernel_esp-1] = (unsigned long)&ret_from_fork;
-	child_union->stack[child_union->task.kernel_esp-2] = &(child_union->task.kernel_esp);
+	child_union->stack[child_union->task.kernel_esp-2] = (unsigned int *)&(child_union->task.kernel_esp);
 
 	list_add_tail(&(child_union->task.list), &readyqueue);
 
