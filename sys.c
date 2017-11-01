@@ -103,7 +103,6 @@ int sys_fork()
 	}
 
 	int j = 0;
-	i = (NUM_PAG_KERNEL + NUM_PAG_CODE);
 	
 	for (i = NUM_PAG_KERNEL+NUM_PAG_CODE; i < (NUM_PAG_KERNEL+NUM_PAG_CODE+NUM_PAG_DATA); ++i) {
 		int data_frame_number = ph_pages [j];
@@ -113,20 +112,21 @@ int sys_fork()
 	} 
 		
 	i = L_USER_START + (NUM_PAG_CODE*PAGE_SIZE);	
-		copy_data((void *)i, (void *)(L_USER_START) + (NUM_PAG_CODE+NUM_PAG_DATA)*PAGE_SIZE, NUM_PAG_DATA*PAGE_SIZE);	
+		copy_data((void *)i, (void *)((L_USER_START) + (NUM_PAG_CODE+NUM_PAG_DATA)*PAGE_SIZE), NUM_PAG_DATA*PAGE_SIZE);	
 		
-	for (i = NUM_PAG_KERNEL + NUM_PAG_CODE + NUM_PAG_DATA; i < NUM_PAG_KERNEL + NUM_PAG_CODE + 2*NUM_PAG_DATA; i++) {
+	for (i = NUM_PAG_KERNEL + NUM_PAG_CODE + NUM_PAG_DATA; i < NUM_PAG_KERNEL + NUM_PAG_CODE + (2*NUM_PAG_DATA); i++) {
 			del_ss_pag(PT_parent, i);
 		}
 	
-	child_union->task.PID = PID;
+	child_union->task.PID = last_PID++; 
 
-	//Cuenta como flush?
 	set_cr3(parent_union->task.dir_pages_baseAddr);	
 	
-	//'Push'' eip and ebp (extra dynamic link)	
-	child_union->stack[child_union->task.kernel_esp-1] = (unsigned long)&ret_from_fork;
-	child_union->stack[child_union->task.kernel_esp-2] = (unsigned int *)&(child_union->task.kernel_esp);
+	//We could also take the ebp of the parent
+	//And just: ebp >> 4 (number of elements in the stack)
+	//stack [1023 - (ebp >> 4)]
+	child_union->task.kernel_esp = &(child_union->stack [1023-18]);	
+	child_union->stack[1023-17] = (unsigned long *)&ret_from_fork;
 
 	list_add_tail(&(child_union->task.list), &readyqueue);
 

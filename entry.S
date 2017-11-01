@@ -103,4 +103,5 @@ fin:
 
 ENTRY (ret_from_fork)
 	RESTORE_ALL
+	movl $0, %eax;
 	iret;	
