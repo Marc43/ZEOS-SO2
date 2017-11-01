@@ -109,9 +109,12 @@ int read_keyboard(unsigned char* letter) {
 }
 
 extern struct task_struct *idle_task;
-void clock_routine (){
-	zeos_ticks++; //Ticks de reloj
+
+void clock_routine (){	
+	++zeos_ticks; //Ticks de reloj
+	update_sched_data_rr();
  	zeos_show_clock();
+
 }
 
 void keyboard_routine () {

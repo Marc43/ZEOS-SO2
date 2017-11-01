@@ -12,6 +12,7 @@
  */
 
 unsigned long last_PID = 0;
+unsigned int ticks_rr = 0;
 
 union task_union protected_tasks[NR_TASKS+2]
   __attribute__((__section__(".data.task")));
@@ -91,7 +92,9 @@ void init_task1(void) {
 		allocate_DIR(task1);
 		set_user_pages(task1); //Initialize pages for task1
 		set_cr3(task1->dir_pages_baseAddr);
-		tss.esp0 = &(task[task1->PID].stack[1023]);	
+		tss.esp0 = &(task[task1->PID].stack[1023]);
+		task1->state = ST_RUN;
+		task1->quantum = 10;	
 		task1->kernel_esp = tss.esp0; //At the start, they point to the same memory position 
 	}
 }
@@ -144,6 +147,7 @@ void inner_task_switch (union task_union* t) {
 	tss.esp0 = &(t->stack[1023]);
 	set_cr3 (t->task.dir_pages_baseAddr); //Set the new page directory (intel will erase TLB)
 //	unsigned int new_esp = t->task.kernel_esp; //The new_esp will be pointing straight to kernel_esp
+	ticks_rr = t->task.quantum = 10; //Ten ticks by default 
 	__asm__ __volatile__ ( 	"movl %%ebp, %0;" 
 						    "movl %1, %%esp;"
 							"popl %%ebp;"
@@ -152,4 +156,71 @@ void inner_task_switch (union task_union* t) {
 							: "m" (t->task.kernel_esp)
 							:);
 
+}
+
+void update_sched_data_rr () {
+	ticks_rr--;
+}
+
+int needs_sched_rr () {
+	if (ticks_rr == 0 || (current()->PID == 0 && !list_empty(&readyqueue))) { //When we take all the quantum
+		return 1;
+	}
+
+
+	return 0;
+}
+
+void update_process_state_rr (struct task_struct *t, struct list_head *dst_queue) {
+	enum state_t s = t->state;
+		switch (s) {
+			case ST_RUN :
+
+				list_del(&(t->list));
+				break;
+
+			case ST_READY :
+
+				list_del(&(t->list));				
+				list_add_tail(&(t->list), dst_queue);
+				break;
+
+			case ST_BLOCKED :
+
+				list_del(&(t->list));
+				list_add_tail(&(t->list), dst_queue);
+				break;
+	}
+}
+
+void sched_next_rr () {
+	if (!list_empty(&readyqueue)) {
+		struct list_head* lh = list_first(&readyqueue);
+		struct task_struct* new = list_head_to_task_struct(lh);
+		new->state = ST_RUN;
+		update_process_state_rr(new, NULL);	
+
+		task_switch((union task_union*) new);
+	}
+	else {
+		task_switch((union task_union*) idle_task);
+	}
+
+	struct task_struct* in_cpu = current();
+	in_cpu->state = ST_READY;
+	update_process_state_rr (in_cpu, &readyqueue);
+}
+
+int get_quantum (struct task_struct *t) {
+	return current()->quantum;
+}
+
+void set_quantum (struct task_struct *t, int new_quantum) {
+	ticks_rr = t->quantum = new_quantum; 
+}
+
+void schedule () {
+	if (needs_sched_rr()) {
+		sched_next_rr();	
+	}
 }
