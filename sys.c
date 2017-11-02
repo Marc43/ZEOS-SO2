@@ -118,7 +118,7 @@ int sys_fork()
 			del_ss_pag(PT_parent, i);
 		}
 	
-	child_union->task.PID = last_PID++; 
+	PID = child_union->task.PID = last_PID++; 
 
 	set_cr3(parent_union->task.dir_pages_baseAddr);	
 	

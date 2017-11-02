@@ -89,16 +89,16 @@ int __attribute__((__section__(".text.main")))
 
   monoprocess_init_addr_space(); /* TO BE DELETED WHEN ADDED THE PROCESS MANAGEMENT CODE TO BECOME MULTIPROCESS */
 	
-  /* Initialize Free && Ready queues */
+  /* Initialize Free && Ready queues 
   init_free_queue();  
   init_ready_queue();
-  /* Initialize Scheduling */
+   Initialize Scheduling */
   init_sched();
 
-  /* Initialize idle task  data */
+  /*Initialize idle task data 
   init_idle();
-  /* Initialize task 1 data */
-  init_task1();
+  Initialize task 1 data 
+  init_task1();*/
 
   /* Move user code/data now (after the page table initialization) */
   copy_data((void *) KERNEL_START + *p_sys_size, usr_main, *p_usr_size);
