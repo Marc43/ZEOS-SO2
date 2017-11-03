@@ -87,15 +87,23 @@ void init_task1(void) {
 	if (!list_empty(&freequeue)) {
 		struct list_head* lh = list_first (&freequeue);
 		list_del(lh); 	
+	
 		struct task_struct* task1 = list_head_to_task_struct(lh);
 		task1->PID = last_PID++;
 		allocate_DIR(task1);
 		set_user_pages(task1); //Initialize pages for task1
 		set_cr3(task1->dir_pages_baseAddr);
 		tss.esp0 = &(task[task1->PID].stack[1023]);
+
+		list_add_tail(&(task1->list), &readyqueue); // **
+	
 		task1->state = ST_RUN;
+		update_process_state_rr(task1, NULL); //Kind of useless (**)
+		
 		task1->quantum = 100;	
+	
 		task1->kernel_esp = tss.esp0; //At the start, they point to the same memory position 
+		
 	}
 }
 
@@ -175,20 +183,21 @@ int needs_sched_rr () {
 
 void update_process_state_rr (struct task_struct *t, struct list_head *dst_queue) {
 	enum state_t s = t->state;
+	struct list_head* lh = &(t->list);
 		switch (s) {
 			case ST_RUN :
-				list_del(&(t->list));
+				list_del(lh);
 				
 				break;
 			case ST_READY :
-				list_del(&(t->list));				
-				list_add_tail(&(t->list), dst_queue);
+				list_del(lh);				
+				list_add_tail(lh, dst_queue);
 				
 				break;
 
 			case ST_BLOCKED :
-				list_del(&(t->list));
-				list_add_tail(&(t->list), dst_queue);
+				list_del(lh);
+				list_add_tail(lh, dst_queue);
 				
 				break;
 	}
@@ -196,6 +205,11 @@ void update_process_state_rr (struct task_struct *t, struct list_head *dst_queue
 
 void sched_next_rr () {
 	if (!list_empty(&readyqueue)) {
+	
+		struct task_struct* in_cpu = current();
+		in_cpu->state = ST_READY;
+		update_process_state_rr(in_cpu, &readyqueue);
+
 		struct list_head* lh = list_first(&readyqueue);
 		struct task_struct* new = list_head_to_task_struct(lh);
 		new->state = ST_RUN;

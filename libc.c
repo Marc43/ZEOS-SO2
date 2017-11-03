@@ -65,21 +65,12 @@ int strlen(char *a)
 
 int write (int fd, char* buffer, int size) {
 	int rt = 0;
-	/*__asm__ __volatile__("movl 8(%ebp), %ebx;" 
-						"movl 12(%ebp), %ecx;"
-						"movl 16(%ebp), %edx;" 
-       					"movl $0x04, %eax;" 
-						"int $0x80;"
-					    "movl %eax, -4(%ebp);" 
-						);*/
 	
-	//Codigo supuestamente seguro ante optimizaciones!
 	__asm__ __volatile__ ("movl $0x04, %%eax;"
                           "int $0x80;"
-                          "movl %%eax, %0"
+                          "movl %%eax, %0;"
                           : "=m" (rt) 
-						  : "b" (fd), "c" (buffer), "d" (size) 
-						  : "%eax", "%ebx", "%ecx", "%edx");
+						  : "b" (fd), "c" (buffer), "d" (size));
 	
 	if (rt < 0) {errno = rt; return -1;}	
 	
@@ -148,8 +139,7 @@ void exit () {
 						  : "eax");
 
 	if (ret < 0) {
-		erno = ret;
-		return -1;
+		errno = ret;
 	}
 
 }
