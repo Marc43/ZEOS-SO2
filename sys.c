@@ -71,7 +71,7 @@ int sys_fork()
 	//Search for physical pages
 	int i = 0;
 	int frame = alloc_frame();	
-	unsigned int ph_pages [NUM_PAG_DATA];
+	int ph_pages [NUM_PAG_DATA];
 	
 	while (frame >= 0 && i < NUM_PAG_DATA) {
 		ph_pages [i] = frame;
@@ -81,6 +81,9 @@ int sys_fork()
 	
 	if (frame < 0) {
 		printk("Insert an error code, no more physical pages available");
+		i = 0;
+		while (i < NUM_PAG_DATA && ph_pages [i] > 0) free_frame(ph_pages [i]);
+		list_add_tail (&(child_union->task.list), &freequeue); //Free frames and restore pcb	
 		return -ENOMEM;
 	}
 
@@ -133,8 +136,12 @@ int sys_fork()
 	return PID;
 }
 
-void sys_exit()
-{  
+void sys_exit() {
+	//First we free all the pages
+	
+	//Add tail PCB
+
+	//Schedule 
 }
 
 int sys_write (int fd, char* buffer, int size) {
@@ -181,3 +188,4 @@ int sys_gettime () {
 	
 	return zeos_ticks;
 }
+

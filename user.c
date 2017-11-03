@@ -22,5 +22,5 @@ int __attribute__ ((__section__(".text.main")))
 		write(1, verifica, strlen(verifica));
 	}		
 	
-	
+	while(1) {}	
 }
