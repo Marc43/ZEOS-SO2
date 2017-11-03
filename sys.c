@@ -65,6 +65,7 @@ int sys_fork()
 	} 
   	else {
 		printk("Insert an error code, that means there are no more pcb's");
+		
 		return -ECHILD;	
 	}
 
@@ -81,6 +82,13 @@ int sys_fork()
 	
 	if (frame < 0) {
 		printk("Insert an error code, no more physical pages available");
+		
+		int i = 0;
+        while (i < NUM_PAG_DATA && ph_pages [i] > 0)                  	free_frame(ph_pages [i]);
+
+		list_add_tail (&(child_union->task.list), &freequeue); //Free frames and restore pcb            
+        //Is the allocated DIR someway attached to the PCB????
+		
 		return -ENOMEM;
 	}
 
@@ -133,8 +141,20 @@ int sys_fork()
 	return PID;
 }
 
-void sys_exit()
-{  
+void sys_exit() {
+	struct task_struct* in_cpu = current();
+	//We have to free the frames, and 're'-queue the PCB
+	page_table_entry* PT = get_PT(in_cpu);
+
+	//list_del(&(in_cpu->list)); This process is actually running, so is not within any list
+
+	int i;
+	for (i = NUM_PAG_KERNEL+NUM_PAG_CODE; i < NUM_PAG_KERNEL+NUM_PAG_CODE+NUM_PAG_DATA; ++i) 
+		free_frame (get_frame(PT, i));	
+	
+	//schedule(); As we do that in the clock interrupt, I think it's not necessary
+
+	set_quantum(in_cpu, 0); //We force a new process to run!
 }
 
 int sys_write (int fd, char* buffer, int size) {

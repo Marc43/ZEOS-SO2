@@ -208,11 +208,15 @@ void sched_next_rr () {
 		struct task_struct* in_cpu = current();
 		in_cpu->state = ST_READY;
 		update_process_state_rr(in_cpu, &readyqueue);
+		in_cpu->stats.ready_ticks += get_ticks()-in_cpu->stats.elapsed_total_ticks;
+		in_cpu->stats.elapsed_total_ticks = get_ticks();
 
 		struct list_head* lh = list_first(&readyqueue);
 		struct task_struct* new = list_head_to_task_struct(lh);
 		new->state = ST_RUN;
 		update_process_state_rr(new, NULL);	
+		new->stats.ready_ticks += get_ticks()-new->stats.elapsed_total_ticks;
+		new->stats.elapsed_total_ticks = get_ticks();
 
 		task_switch((union task_union*) new);
 	}

@@ -14,13 +14,28 @@
 
 enum state_t { ST_RUN, ST_READY, ST_BLOCKED };
 
+struct stats_s {
+	unsigned long user_ticks;
+	unsigned long system_ticks;
+	unsigned long blocked_ticks;
+	unsigned long ready_ticks;
+	unsigned long total_trans;
+	unsigned long remaining_ticks;
+	unsigned long elapsed_total_ticks;
+};
+
 struct task_struct {
   int PID;			/* Process ID. This MUST be the first field of the struct. */
   page_table_entry * dir_pages_baseAddr;
+  
   unsigned int kernel_esp; //To undo the dynamic link and some black magic
   unsigned int quantum;
+  
   enum state_t state;
+  
   struct list_head list; 
+
+  struct stats_s stats;
 };
 
 union task_union {

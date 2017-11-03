@@ -115,6 +115,10 @@ void clock_routine (){
  	schedule();
 	zeos_show_clock();
 
+	struct task_struct* in_cpu;
+	in_cpu->stats.user_ticks += get_ticks()-in_cpu->stats.elapsed_total_ticks;
+	in_cpu->stats.elapsed_total_ticks = get_ticks();
+
 }
 
 void keyboard_routine () {
