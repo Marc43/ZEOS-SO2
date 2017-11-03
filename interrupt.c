@@ -109,9 +109,12 @@ int read_keyboard(unsigned char* letter) {
 }
 
 extern struct task_struct *idle_task;
-void clock_routine (){
-	zeos_ticks++; //Ticks de reloj
- 	zeos_show_clock();
+
+void clock_routine (){	
+	++zeos_ticks; //Ticks de reloj
+ 	schedule();
+	zeos_show_clock();
+
 }
 
 void keyboard_routine () {
@@ -119,13 +122,6 @@ void keyboard_routine () {
 	read_keyboard(&char_to_print);
 	printc_xy(0x00, 0x00, char_to_print);
 	
-	if (!list_empty(&readyqueue)) {
-		struct list_head* lh = list_first (&readyqueue);
-		list_del(lh);
-
-		struct task_struct* to_switch = list_head_to_task_struct(lh);
-		task_switch ((union task_union*)to_switch);
-	}	
 /*	do {
 	  printc_xy(0x00, 0x00, char_to_print);
 	}

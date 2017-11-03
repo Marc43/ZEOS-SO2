@@ -18,6 +18,8 @@ struct task_struct {
   int PID;			/* Process ID. This MUST be the first field of the struct. */
   page_table_entry * dir_pages_baseAddr;
   unsigned int kernel_esp; //To undo the dynamic link and some black magic
+  unsigned int quantum;
+  enum state_t state;
   struct list_head list; 
 };
 
@@ -31,7 +33,6 @@ struct list_head readyqueue;
 
 extern union task_union protected_tasks[NR_TASKS+2];
 extern union task_union *task; /* Vector de tasques */
-//extern struct task_struct *idle_task;
 
 #define KERNEL_ESP(t)       	(DWord) &(t)->stack[KERNEL_STACK_SIZE]
 
@@ -60,9 +61,20 @@ page_table_entry * get_DIR (struct task_struct *t) ;
 
 /* Headers for the scheduling policy */
 void sched_next_rr();
+
 void update_process_state_rr(struct task_struct *t, struct list_head *dest);
+
 int needs_sched_rr();
+
 void update_sched_data_rr();
+
+void schedule();
+
+/* Quantum getter and setter */
+
+int get_quantum (struct task_struct *t); //How many CPU ticks a process can waste
+
+void set_quantum (struct task_struct *t, int new_quantum); //Set a new quantum for task t
 
 /* Init free && ready queue */
 

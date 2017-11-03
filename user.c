@@ -12,12 +12,15 @@ int __attribute__ ((__section__(".text.main")))
 	
 	int k =	fork();	
 	char* verifica = "";
-	if (k == 0) {
-		verifica = "Son\n";
-	}
-	else verifica = "Dad\n";
-	write(1, verifica, strlen(verifica));
 
- 	while(1) {}
+	if (k > 0) {
+		verifica = "Dad\n";
+		write(1, verifica, strlen(verifica));
+	}
+	else if (k == 0) {
+		verifica = "Child";			
+		write(1, verifica, strlen(verifica));
+	}		
 	
+	while(1) {}	
 }
