@@ -84,6 +84,7 @@ void init_idle (void) {
 }
 
 void init_task1(void) {
+	//la lista esta fallando, poner el proceso de run a cola
 	if (!list_empty(&freequeue)) {
 		struct list_head* lh = list_first (&freequeue);
 		list_del(lh); 	
@@ -190,13 +191,11 @@ void update_process_state_rr (struct task_struct *t, struct list_head *dst_queue
 				
 				break;
 			case ST_READY :
-				list_del(lh);				
 				list_add_tail(lh, dst_queue);
 				
 				break;
 
 			case ST_BLOCKED :
-				list_del(lh);
 				list_add_tail(lh, dst_queue);
 				
 				break;
@@ -234,6 +233,5 @@ void schedule () {
 	update_sched_data_rr();
 	if (needs_sched_rr()) {
 		sched_next_rr();
-		printk("New process \n");	
 	}
 }
