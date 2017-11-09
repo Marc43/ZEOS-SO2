@@ -104,7 +104,7 @@ int __attribute__((__section__(".text.main")))
   copy_data((void *) KERNEL_START + *p_sys_size, usr_main, *p_usr_size);
   
   printk("Entering user mode...");
-
+  zeos_init_auxjp();
   enable_int();
   /* Define entries to the IDT and Enable them (Is here the place to do this??) */
  // extern void keyboard_handler(); 

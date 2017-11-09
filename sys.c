@@ -151,10 +151,11 @@ void sys_exit() {
 	int i;
 	for (i = NUM_PAG_KERNEL+NUM_PAG_CODE; i < NUM_PAG_KERNEL+NUM_PAG_CODE+NUM_PAG_DATA; ++i) 
 		free_frame (get_frame(PT, i));	
-	
-	//schedule(); As we do that in the clock interrupt, I think it's not necessary
 
-	set_quantum(in_cpu, 0); //We force a new process to run!
+	//ALliberar PCB (encuar cua FREES);	
+	list_del(&(in_cpu->list));
+	
+	sched_next_rr();
 }
 
 int sys_write (int fd, char* buffer, int size) {

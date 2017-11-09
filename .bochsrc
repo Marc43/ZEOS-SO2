@@ -12,7 +12,7 @@ error: action=report
 info: action=report
 debug: action=ignore
 debugger_log: -
-
+port_e9_hack : enabled=1
 #vga_update_interval: 300000
 #keyboard_serial_delay: 250
 #keyboard_paste_delay: 100000
