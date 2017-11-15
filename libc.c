@@ -143,3 +143,22 @@ void exit () {
 	}
 
 }
+
+int clone (void (*function) (void), void *stack) {
+	unsigned long int ret;
+	__asm__ __volatile__ ("movl $19, %%eax;"
+						  "int $0x80;"
+						  "movl %%eax, %0;"
+						  : "=m" (ret) 
+						  : "b" (function), "c" (stack) 
+						  :);
+	
+	if (ret < 0) {
+		errno = ret;
+		 
+		return -1;
+	}
+	
+	return ret;
+ 
+}

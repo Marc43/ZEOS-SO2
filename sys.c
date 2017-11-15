@@ -187,3 +187,9 @@ int sys_gettime () {
 	
 	return zeos_ticks;
 }
+
+int sys_clone (void (*function)(void), void* stack) {
+	printk ("Sys_clone executed, dummy one");
+
+	return 1;	
+}
