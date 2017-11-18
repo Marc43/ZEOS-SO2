@@ -101,5 +101,7 @@ fin:
 	RESTORE_ALL
 	iret //Return from kernel privilege level...
 
-
-	
+ENTRY (ret_from_fork)
+	RESTORE_ALL
+	movl $0, %eax;
+	iret;	

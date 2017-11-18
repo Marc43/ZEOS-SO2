@@ -28,10 +28,10 @@ LINKFLAGS = -g
 
 SYSOBJ = interrupt.o entry.o sys_call_table.o io.o sched.o sys.o mm.o devices.o utils.o hardware.o list.o
 
-LIBZEOS = -L . -l zeos
+LIBZEOS = -L . -l zeos -l auxjp
 
 #add to USROBJ the object files required to complete the user program
-USROBJ = libc.o # libjp.a
+USROBJ = libc.o libjp.a
 
 all:zeos.bin
 
@@ -68,6 +68,7 @@ io.o:io.c $(INCLUDEDIR)/io.h
 sched.o:sched.c $(INCLUDEDIR)/sched.h
 
 libc.o:libc.c $(INCLUDEDIR)/libc.h
+	gcc -m32 -g -fno-omit-frame-pointer -ffreestanding -Wall -Iinclude   -c -o libc.o libc.c
 
 mm.o:mm.c $(INCLUDEDIR)/types.h $(INCLUDEDIR)/mm.h
 

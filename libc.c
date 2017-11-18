@@ -6,16 +6,18 @@
 
 #include <types.h>
 
+#include <errno.h>
+
 int errno = 0;
 
 void perror() {
 	char* msg;
-	char string [128] = "Seems like all has gone nice! (Or not, but I don't care)...";
+	char string [128] = "Seems like";
 	msg = &string[0];	
 	  
 	if (errno < 0) {
 	
-         if (errno == -38) {
+         if (errno == -EMSGSIZE) {
              char aux [128] = "Function not implemented in ZeOS...";
         	 msg = &aux [0];
 		}
@@ -62,36 +64,82 @@ int strlen(char *a)
 }
 
 int write (int fd, char* buffer, int size) {
-	int ret;
-	__asm__ __volatile__("movl 8(%%ebp), %%ebx;" 
-						"movl 12(%%ebp), %%ecx;"
-						"movl 16(%%ebp), %%edx;" 
-       					"movl $0x04, %%eax;" 
-						"int $0x80;"
-						"movl %%ebp, %%esp;"
-						"popl %%ebp;"
-						"ret;"
-						:"=a" ( ret ) ::);
-
-	if (ret < 0) {errno = ret; return -1;}
-
-	return ret;
-
-/*__asm__ __volatile__("int 0x80;"
-                  :"=a"(ret):"+b"(fd),"+c"(buffer),"+d"(size):"a");*/
+	int rt = 0;
+	
+	__asm__ __volatile__ ("movl $0x04, %%eax;"
+                          "int $0x80;"
+                          "movl %%eax, %0;"
+                          : "=m" (rt) 
+						  : "b" (fd), "c" (buffer), "d" (size));
+	
+	if (rt < 0) {errno = rt; return -1;}	
+	
+	return rt;
 
 }
 
 int gettime () {
-	unsigned long int ret;
-	__asm__ __volatile__("movl $10, %%eax;"
-						"int $0x80;"
-						"movl %%ebp, %%esp;"
-						"popl %%ebp;"
-						"ret;"
-						:"=a" ( ret ) ::);
+	unsigned long int ret = 0;
+	__asm__ __volatile__ ("movl $10, %%eax;"
+					      "int $0x80;"
+						  "movl %%eax, %0;"
+						  : "=m" (ret)
+						  :
+						  : "eax");
 
-	if (ret < 0) {errno = ret; return -1;}	
+	if (ret < 0) {
+		errno = ret;
+		return -1;
+	}	
 	
 	return ret;
+}
+
+int getpid () {
+	unsigned long int ret = 0;
+	__asm__ __volatile__ ("movl $20, %%eax;"
+						  "int $0x80;"
+						  "movl %%eax, %0;"
+						  : "=m" (ret)
+						  :
+						  : "eax");
+	
+	if (ret < 0) {
+		errno = ret;
+		return -1;
+	}
+
+	return ret;
+}
+
+int fork () {
+	unsigned long int ret = 0;
+	__asm__ __volatile__ ("movl $2, %%eax;"
+						  "int $0x80;"
+					      "movl %%eax, %0;" //At this point, child and parent will have different return values
+						  : "=m" (ret)
+						  :	
+						  : "eax");
+
+	if (ret < 0) {
+		errno = ret;
+		return -1;
+	}	
+
+	return ret;
+}
+
+void exit () {
+	unsigned long int ret = 0;
+	__asm__ __volatile__ ("movl $1, %%eax;"
+						  "int $0x80;"
+						  "movl %%eax, %0;"
+						  : "=m" (ret)
+						  : 
+						  : "eax");
+
+	if (ret < 0) {
+		errno = ret;
+	}
+
 }

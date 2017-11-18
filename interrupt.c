@@ -84,6 +84,7 @@ void setIdt()
   idtR.limit = IDT_ENTRIES * sizeof(Gate) - 1;
 
   set_handlers();
+
   /* ADD INITIALIZATION CODE FOR INTERRUPT VECTOR */
   setInterruptHandler (32, clock_handler, 0);
   setInterruptHandler (33, keyboard_handler, 0);
@@ -107,18 +108,29 @@ int read_keyboard(unsigned char* letter) {
 	
 }
 
+extern struct task_struct *idle_task;
+
 void clock_routine (){
-	zeos_ticks++; //Ticks de reloj
- 	zeos_show_clock();
+	current()->stats.user_ticks += get_ticks()-current()->stats.elapsed_total_ticks;
+	current()->stats.elapsed_total_ticks = get_ticks();
+	
+	++zeos_ticks; //Ticks
+ 	schedule();
+	zeos_show_clock();
+
+	current()->stats.system_ticks += get_ticks()-current()->stats.elapsed_total_ticks;
+	current()->stats.elapsed_total_ticks = get_ticks();
+
 }
 
 void keyboard_routine () {
   	unsigned char char_to_print = ' ';
 	read_keyboard(&char_to_print);
-	do {
+	printc_xy(0x00, 0x00, char_to_print);
+	
+/*	do {
 	  printc_xy(0x00, 0x00, char_to_print);
 	}
-	while (read_keyboard(&char_to_print));	
-	while(1);
-
+	while (read_keyboard(&char_to_print));		*/
 }
+
