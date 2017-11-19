@@ -190,6 +190,26 @@ int sys_gettime () {
 
 int sys_clone (void (*function)(void), void* stack) {
 	printk ("Sys_clone executed, dummy one");
+	
+	if (!empty(&freequeue)) {	
+		struct list_head* lh = list_first (&freequeue);
+		list_del(lh);
+		
+		struct task_struct* thread = list_head_to_task_struct (lh);
+		thread->task.kernel_esp = stack; //We fool the task, we make it point to another point of memory different than its own
+		thread->pid = last_PID++;
+		//TODO Task stack must be in our logical space, but I guess this will be a page fault handler error...
+		__asm__ __volatile__ ("movl %1, %%esp;" //We set the new esp...
+							  "pushl %0;"		//Push the eip
+							  "pushl $0;"		//ebp 0... TODO could be the last direction of the stack??? [1023?????]
+						      :	
+							  : "=m" (function), "=m" (stack)
+							  :);	
+
+	}
+	else {
+		printk ("No more PCB's free, output an error (Errno)");
+	}
 
 	return 1;	
 }
