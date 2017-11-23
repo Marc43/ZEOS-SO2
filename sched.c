@@ -253,3 +253,30 @@ void schedule () {
 		sched_next_rr();
 	}
 }
+
+struct task_struct *getPCBfromPID (int pid, struct list_head *queue){
+	struct task_struct *pcb;
+
+	if (current()->PID == pid) return current();
+	else if (!list_empty (queue)){
+		// Obtengo el primer elemento de la cola
+		struct list_head *first = list_first (queue);
+		pcb = list_head_to_task_struct(first);
+		if (pcb->PID == pid) return pcb;
+		// Saco el primer elmento (first) y lo vuelvo a insertar 
+		// al final de la cola
+		list_del (queue);
+		list_add_tail(first,queue);
+
+		struct list_head *elementoActual = list_first(queue);
+
+		while (first != elementoActual){
+			pcb = list_head_to_task_struct(elementoActual);
+			if (pcb->PID == pid) return pcb;
+			list_del (queue);
+			list_add_tail (elementoActual, queue);
+			elementoActual = list_first(queue);
+		}
+	}
+	return NULL;
+}

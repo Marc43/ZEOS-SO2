@@ -65,7 +65,7 @@ int sys_fork()
 	} 
   	else {
 		printk("Insert an error code, that means there are no more pcb's");
-		
+	
 		return -ECHILD;	
 	}
 
@@ -82,7 +82,7 @@ int sys_fork()
 	
 	if (frame < 0) {
 		printk("Insert an error code, no more physical pages available");
-		
+	
 		int i = 0;
         while (i < NUM_PAG_DATA && ph_pages [i] > 0)                  	free_frame(ph_pages [i]);
 
@@ -102,7 +102,7 @@ int sys_fork()
 		//from 0 to 255 because we know that addresses (kernel ph_pages)
 		i++;
 	}
-	
+
 	i = NUM_PAG_KERNEL;	
 	while (i < NUM_PAG_KERNEL + NUM_PAG_CODE) {
 		unsigned int code_frame_number = get_frame(PT_parent, i);
@@ -186,4 +186,18 @@ int sys_write (int fd, char* buffer, int size) {
 int sys_gettime () {
 	
 	return zeos_ticks;
+}
+
+int sys_get_stats (int pid, struct stats *st){
+	struct task_struct *ts;
+	
+	//Comprobaciones
+	if (access_ok(VERIFY_WRITE,st,56) == 0) return -EACCES;
+	
+	//Busqueda del PCB
+	ts = getPCBfromPID (pid, &readyqueue);
+	if (ts != NULL ) copy_to_user(&ts->stats, st, 56);
+
+	else return -ESRCH;
+	return 0;
 }
