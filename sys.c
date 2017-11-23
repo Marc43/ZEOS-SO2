@@ -189,27 +189,39 @@ int sys_gettime () {
 }
 
 int sys_clone (void (*function)(void), void* stack) {
-	printk ("Sys_clone executed, dummy one");
+
+	//Check if "stack" exists, "function"... etc... TODO How?
 	
-	if (!empty(&freequeue)) {	
+	if (!list_empty(&freequeue)) {	
 		struct list_head* lh = list_first (&freequeue);
 		list_del(lh);
 		
-		struct task_struct* thread = list_head_to_task_struct (lh);
-		thread->task.kernel_esp = stack; //We fool the task, we make it point to another point of memory different than its own
-		thread->pid = last_PID++;
-		//TODO Task stack must be in our logical space, but I guess this will be a page fault handler error...
-		__asm__ __volatile__ ("movl %1, %%esp;" //We set the new esp...
-							  "pushl %0;"		//Push the eip
-							  "pushl $0;"		//ebp 0... TODO could be the last direction of the stack??? [1023?????]
-						      :	
-							  : "=m" (function), "=m" (stack)
-							  :);	
+		struct task_struct* task_thread = list_head_to_task_struct (lh);
+		union task_union* 	thread = (union task_union*) task_thread;
+		union task_union*	current_tasku = (union task_union*) current();
 
+		thread->task.dir_pages_baseAddr = current_tasku->task.dir_pages_baseAddr;
+		thread->task.kernel_esp = &(thread->stack[1023-17]); 
+		thread->task.PID = last_PID++;
+		
+		//Supposing that we have to 'push' the processor state...
+		int i = 0; //TODO Erase those commented lines, junk
+		for (i = 0; i < 16; ++i) //sixteen is the size of the state
+			thread->stack[1023-i] = &(current_tasku->stack[1023-i]);
+
+		unsigned long* user_bottom = &(stack[1023]);
+		//TODO Check all the stack positions...
+		thread->stack[1006] = user_bottom;
+		thread->stack[1007] = function;
+	
+		list_add_tail(&(thread->task.list), &readyqueue);
+
+		return last_PID;
 	}
 	else {
 		printk ("No more PCB's free, output an error (Errno)");
+		return -1;
 	}
 
-	return 1;	
+	return -1;
 }

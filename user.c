@@ -1,8 +1,13 @@
 #include <libc.h>
 
-char buff[24];
-
 int pid;
+
+int dummy_function () {
+	char buff[128] = "Clone fucking worked!";
+	if (write(1, &buff[0], strlen(buff)))
+		return 1;	
+	else return -1;
+}
 
 int __attribute__ ((__section__(".text.main")))
   main(void)
@@ -11,7 +16,8 @@ int __attribute__ ((__section__(".text.main")))
      /* __asm__ __volatile__ ("mov %0, %%cr3"::"r" (0) ); */
 
 	char* k [1024];
-	clone(0x1123, k);
+	clone((unsigned long*) dummy_function, &k[0]);
 	
 	while(1) {}	
 }
+
