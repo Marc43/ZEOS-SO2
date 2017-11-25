@@ -69,10 +69,10 @@ int write (int fd, char* buffer, int size) {
 	__asm__ __volatile__ ("movl $0x04, %%eax;"
                           "int $0x80;"
                           "movl %%eax, %0;"
-                          : "=m" (rt) 
+                          : "=a" (rt) 
 						  : "b" (fd), "c" (buffer), "d" (size));
 	
-	if (rt < 0) {errno = rt; return -1;}	
+	if (rt < 0) {errno = -rt; return -1;}	
 	
 	return rt;
 
@@ -88,7 +88,7 @@ int gettime () {
 						  : "eax");
 
 	if (ret < 0) {
-		errno = ret;
+		errno = -ret;
 		return -1;
 	}	
 	

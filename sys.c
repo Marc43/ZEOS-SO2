@@ -160,27 +160,27 @@ void sys_exit() {
 
 int sys_write (int fd, char* buffer, int size) {
 	char mkernel_buff[4];
-    int bytesWritten = 0;
-	int error = check_fd (fd, 1);
+	int bytesWritten = 0;
+	int error = check_fd (fd, ESCRIPTURA);
 	
-	if (error != 0) return error;
-	if (buffer == NULL) return -EINVAL;
-	if (size <= 0) return -EINVAL;
+	if (error != 0) return -EBADF;
+	if (buffer == NULL) return -EFAULT;
+	if (size < 0) return -EINVAL;
 	if (access_ok(VERIFY_READ, buffer, size) == 0) return -EACCES;
 	
-    // traspaso de bloques de 4 en 4 bytes
-    for (;size > 4; buffer +=  4, size -= 4){
+    	// traspaso de bloques de 4 en 4 bytes
+    	for (;size > 4; buffer +=  4, size -= 4){
 		copy_from_user(buffer, mkernel_buff, 4);
 		bytesWritten += sys_write_console(mkernel_buff,4);
 	}
             
-    // traspaso del resto del buffer
-    if (size != 0){
+    	// traspaso del resto del buffer
+    	if (size != 0){
 	    copy_from_user(buffer, mkernel_buff, size);
 	    bytesWritten += sys_write_console(mkernel_buff,size);
-    }
+    	}	
  
-    return bytesWritten;    // Devuelve el num. de bytes escritos
+    	return bytesWritten;    // Devuelve el num. de bytes escritos
 }
 
 int sys_gettime () {
