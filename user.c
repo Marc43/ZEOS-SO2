@@ -2,11 +2,11 @@
 
 int pid;
 
-int dummy_function () {
-	char buff[128] = "Clone fucking worked!";
-	if (write(1, &buff[0], strlen(buff)))
-		return 1;	
-	else return -1;
+char buff[128] = "Clone fucking worked!";
+
+void dummy_function () {
+	write(1, &buff[0], strlen(buff));
+	exit();
 }
 
 int __attribute__ ((__section__(".text.main")))

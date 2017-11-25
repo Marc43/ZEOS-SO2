@@ -72,7 +72,7 @@ int write (int fd, char* buffer, int size) {
                           : "=m" (rt) 
 						  : "b" (fd), "c" (buffer), "d" (size));
 	
-	if (rt < 0) {errno = rt; return -1;}	
+	if (-rt > 0) {errno = rt; return -1;}	
 	
 	return rt;
 
@@ -87,7 +87,7 @@ int gettime () {
 						  :
 						  : "eax");
 
-	if (ret < 0) {
+	if (-ret > 0) {
 		errno = ret;
 		return -1;
 	}	
@@ -104,7 +104,7 @@ int getpid () {
 						  :
 						  : "eax");
 	
-	if (ret < 0) {
+	if (-ret > 0) {
 		errno = ret;
 		return -1;
 	}
@@ -121,7 +121,7 @@ int fork () {
 						  :	
 						  : "eax");
 
-	if (ret < 0) {
+	if (-ret > 0) {
 		errno = ret;
 		return -1;
 	}	
@@ -138,7 +138,7 @@ void exit () {
 						  : 
 						  : "eax");
 
-	if (ret < 0) {
+	if (-ret > 0) {
 		errno = ret;
 	}
 
@@ -151,9 +151,9 @@ int clone (void (*function) (void), void *stack) {
 						  "movl %%eax, %0;"
 						  : "=m" (ret) 
 						  : "b" (function), "c" (stack) 
-						  :);
+						  : "eax");
 	
-	if (ret < 0) {
+	if (-ret > 0) {
 		errno = ret;
 		 
 		return -1;

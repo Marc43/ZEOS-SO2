@@ -42,7 +42,7 @@ page_table_entry * get_PT (struct task_struct *t)
 
 int allocate_DIR(struct task_struct *t) 
 {
-	int pos;
+	int pos; //TODO Adapt allocate_DIR to thread implementation
 
 	pos = ((int)t-(int)task)/sizeof(union task_union);
 

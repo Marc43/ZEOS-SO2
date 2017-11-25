@@ -205,9 +205,10 @@ int sys_clone (void (*function)(void), void* stack) {
 		thread->task.PID = last_PID++;
 		
 		//Supposing that we have to 'push' the processor state...
-		int i = 0; //TODO Erase those commented lines, junk
+		//TODO Use Copydata, does exactly the same!
+		int i = 0;
 		for (i = 0; i < 16; ++i) //sixteen is the size of the state
-			thread->stack[1023-i] = &(current_tasku->stack[1023-i]);
+			thread->stack[1023-i] = current_tasku->stack[1023-i];
 
 		unsigned long* user_bottom = &(stack[1023]);
 		//TODO Check all the stack positions...
