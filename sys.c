@@ -44,11 +44,16 @@ int sys_fork()
 {
 
   	int PID=-1;
-  	// creates the child process
-  	union task_union* child_union;
+  	
+	union task_union* child_union;
 	union task_union* parent_union;
 
-	if (!list_empty(&freequeue)) {
+	if (list_empty(&freequeue)) {	
+		printk("Insert an error code, that means there are no more pcb's");
+	
+		return -ECHILD;	
+	} 
+  	else {	
 		struct list_head* lh = list_first (&freequeue);
 		list_del(lh);
 
@@ -61,12 +66,7 @@ int sys_fork()
 		//The size of the union is the max(task_struct, stack)	
 		copy_data(parent_union, child_union, sizeof(union task_union));
 
-		allocate_DIR(&(child_union->task)); //Does not contemplate any error...
-	} 
-  	else {
-		printk("Insert an error code, that means there are no more pcb's");
-	
-		return -ECHILD;	
+		if (!allocate_DIR(&(child_union->task))) return -1; //Search some error
 	}
 
 	//Search for physical pages
@@ -82,12 +82,13 @@ int sys_fork()
 	
 	if (frame < 0) {
 		printk("Insert an error code, no more physical pages available");
+
+		free_user_pages(&(child_union->task));	
 	
-		int i = 0;
-        while (i < NUM_PAG_DATA && ph_pages [i] > 0)                  	free_frame(ph_pages [i]);
+		int size_phpages = i; 
+		for (i = 0; i < size_phpages; ++i) free_frame(ph_pages [i]);		
 
 		list_add_tail (&(child_union->task.list), &freequeue); //Free frames and restore pcb            
-        //Is the allocated DIR someway attached to the PCB????
 		
 		return -ENOMEM;
 	}
@@ -143,17 +144,21 @@ int sys_fork()
 
 void sys_exit() {
 	struct task_struct* in_cpu = current();
-	//We have to free the frames, and 're'-queue the PCB
+
 	page_table_entry* PT = get_PT(in_cpu);
+	
+	int i = 0;
+	while (i < (NUM_PAG_KERNEL + NUM_PAG_CODE + NUM_PAG_DATA)) {
+		if (i > (NUM_PAG_KERNEL+NUM_PAG_CODE)) {
+			unsigned int frame = get_frame(PT, i);
+			free_frame(frame);
+		}
+		del_ss_pag(PT, i);
+		++i;	
+	}
 
-	//list_del(&(in_cpu->list)); This process is actually running, so is not within any list
-
-	int i;
-	for (i = NUM_PAG_KERNEL+NUM_PAG_CODE; i < NUM_PAG_KERNEL+NUM_PAG_CODE+NUM_PAG_DATA; ++i) 
-		free_frame (get_frame(PT, i));	
-
-	//ALliberar PCB (encuar cua FREES);	
-	list_del(&(in_cpu->list));
+	in_cpu->PID = -1; //To ensure our 'search' algorithm does not match at any cost
+	list_add_tail(&(in_cpu->list), &freequeue);
 	
 	sched_next_rr();
 }
@@ -196,8 +201,9 @@ int sys_get_stats (int pid, struct stats *st){
 	
 	//Busqueda del PCB
 	ts = getPCBfromPID (pid, &readyqueue);
-	if (ts != NULL ) copy_to_user(&ts->stats, st, 56);
-
+	
+	if (ts != NULL) copy_to_user(&(ts->stats), st, 56);
 	else return -ESRCH;
+
 	return 0;
 }

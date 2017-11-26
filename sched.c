@@ -266,7 +266,7 @@ struct task_struct *getPCBfromPID (int pid, struct list_head *queue){
 		// Saco el primer elmento (first) y lo vuelvo a insertar 
 		// al final de la cola
 		list_del (queue);
-		list_add_tail(first,queue);
+		list_add_tail(first, queue);
 
 		struct list_head *elementoActual = list_first(queue);
 
@@ -278,5 +278,6 @@ struct task_struct *getPCBfromPID (int pid, struct list_head *queue){
 			elementoActual = list_first(queue);
 		}
 	}
+
 	return NULL;
 }
