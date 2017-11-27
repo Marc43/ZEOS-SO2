@@ -105,7 +105,7 @@ int getpid () {
 						  : "eax");
 	
 	if (ret < 0) {
-		errno = ret;
+		errno = -ret;
 		return -1;
 	}
 
@@ -122,7 +122,7 @@ int fork () {
 						  : "eax");
 
 	if (ret < 0) {
-		errno = ret;
+		errno = -ret;
 		return -1;
 	}	
 
@@ -139,7 +139,7 @@ void exit () {
 						  : "eax");
 
 	if (ret < 0) {
-		errno = ret;
+		errno = -ret;
 	}
 
 }
@@ -153,7 +153,7 @@ int get_stats (int pid, struct stats *st){
 			      :
 			      : "eax" );
 	if (ret < 0){
-		errno = ret;
+		errno = -ret;
 		ret = -1;
 	}
 

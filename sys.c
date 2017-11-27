@@ -192,15 +192,16 @@ int sys_gettime () {
 }
 
 int sys_get_stats (int pid, struct stats *st){
-	struct task_struct *ts;
+	__volatile__ struct task_struct *ts;
 	
 	//Comprobaciones
-	if (access_ok(VERIFY_WRITE,st,56) == 0) return -EACCES;
+	if (pid < 0 ) return -EINVAL;
+	if (access_ok(VERIFY_WRITE,st,sizeof(struct stats_s)) == 0) return -EACCES;
 	
 	//Busqueda del PCB
 	ts = getPCBfromPID (pid, &readyqueue);
 	
-	if (ts != NULL) copy_to_user(&(ts->stats), st, 56);
+	if (ts != NULL) copy_to_user(&(ts->stats), st, sizeof(struct stats_s));
 	else return -ESRCH;
 
 	return 0;
