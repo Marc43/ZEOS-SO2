@@ -22,6 +22,7 @@ int __attribute__ ((__section__(".text.main")))
 		buff = &buffer2;
 		write(1,buff,strlen(buff));
 	}
-*/	runjp();	
+*/	
+	runjp();	
 	while(1) {}	
 }

@@ -115,8 +115,8 @@ void clock_routine (){
 	current()->stats.elapsed_total_ticks = get_ticks();
 	
 	++zeos_ticks; //Ticks
- 	schedule();
 	zeos_show_clock();
+ 	schedule();
 
 	current()->stats.system_ticks += get_ticks()-current()->stats.elapsed_total_ticks;
 	current()->stats.elapsed_total_ticks = get_ticks();

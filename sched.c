@@ -84,7 +84,6 @@ void init_idle (void) {
 }
 
 void init_task1(void) {
-	//la lista esta fallando, poner el proceso de run a cola
 	if (!list_empty(&freequeue)) {
 		struct list_head* lh = list_first (&freequeue);
 		list_del(lh); 	
@@ -94,12 +93,10 @@ void init_task1(void) {
 		allocate_DIR(task1);
 		set_user_pages(task1); //Initialize pages for task1
 		set_cr3(task1->dir_pages_baseAddr);
-		tss.esp0 = &(task[task1->PID].stack[1023]);
-
-		list_add_tail(&(task1->list), &readyqueue); // **
+		union task_union* task1_union = (union task_union*)(task1);
+		tss.esp0 = &(task1_union->stack[1023]);
 	
-		task1->state = ST_RUN;
-		update_process_state_rr(task1, NULL); //Kind of useless (**)
+		update_process_state_rr(task1, NULL); 
 		
 		task1->quantum = 100;	
 	
@@ -183,51 +180,31 @@ int needs_sched_rr () {
 }
 
 void update_process_state_rr (struct task_struct *t, struct list_head *dst_queue) {
-	//enum state_t s = t->state;
 	struct list_head* lh = &(t->list);
-	/*	switch (s) {
-			case ST_RUN :
-				list_del(lh);
-				
-				break;
-			case ST_READY :
-				list_add_tail(lh, dst_queue);
-				
-				break;
-
-			case ST_BLOCKED :
-				list_add_tail(lh, dst_queue);
-				
-				break;
-	}*/
 
 	if (dst_queue == NULL) {
 		//Means that t must RUN
 		t->state = ST_RUN;
-		list_del(lh);
-		
 	}
 	else {
 		t->state = ST_READY;
 		list_add_tail(lh, dst_queue); //By the moment only ready
-	
 	}
 }
 
 void sched_next_rr () {
 	if (!list_empty(&readyqueue)) {
-	
-		//To ready
-		struct task_struct* in_cpu = current();
-		update_process_state_rr(in_cpu, &readyqueue);
-
 		current()->stats.system_ticks += get_ticks()-current()->stats.elapsed_total_ticks;
 		current()->stats.elapsed_total_ticks = get_ticks();		
 
 		//To run
 		struct list_head* lh = list_first(&readyqueue);
 		struct task_struct* new = list_head_to_task_struct(lh);
-		update_process_state_rr(new, NULL);	
+		list_del(lh); //Extract the process from the queue
+
+		update_process_state_rr(new, NULL);
+
+		update_process_state_rr(current(), &readyqueue);	
 		
 		task_switch((union task_union*) new);	
 		

@@ -10,6 +10,4 @@
 
 extern TSS         tss;
 extern Descriptor* gdt;
-int	errno;
-
 #endif  /* __SYSTEM_H__ */

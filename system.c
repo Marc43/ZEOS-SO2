@@ -86,8 +86,6 @@ int __attribute__((__section__(".text.main")))
   init_mm();
 
 /* Initialize an address space to be used for the monoprocess version of ZeOS */
-
-  monoprocess_init_addr_space(); /* TO BE DELETED WHEN ADDED THE PROCESS MANAGEMENT CODE TO BECOME MULTIPROCESS */
 	
   /* Initialize Free && Ready queues 
   init_free_queue();  

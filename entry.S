@@ -52,9 +52,6 @@
       movl %edx, %es
 
 #define RESTORE_ALL \
-      movl $__USER_DS, %edx; \
-      movl %edx, %ds; \
-      movl %edx, %es; \
       popl %ebx; \
       popl %ecx; \
       popl %edx; \

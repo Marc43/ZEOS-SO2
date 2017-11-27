@@ -66,17 +66,16 @@ int sys_fork()
 		//The size of the union is the max(task_struct, stack)	
 		copy_data(parent_union, child_union, sizeof(union task_union));
 
-		if (!allocate_DIR(&(child_union->task))) return -1; //Search some error
+		allocate_DIR(&(child_union->task));
 	}
 
 	//Search for physical pages
-	int i = 0;
-	int frame = alloc_frame();	
+	int i = 0; int frame;
 	unsigned int ph_pages [NUM_PAG_DATA];
 	
 	while (frame >= 0 && i < NUM_PAG_DATA) {
+		frame = alloc_frame();	
 		ph_pages [i] = frame;
-		frame = alloc_frame();
 		i++;		
 	}
 	
@@ -139,7 +138,7 @@ int sys_fork()
 
 	list_add_tail(&(child_union->task.list), &readyqueue);
 
-	return PID;
+	return last_PID;
 }
 
 void sys_exit() {
@@ -188,8 +187,7 @@ int sys_write (int fd, char* buffer, int size) {
     	return bytesWritten;    // Devuelve el num. de bytes escritos
 }
 
-int sys_gettime () {
-	
+int sys_gettime () {	
 	return zeos_ticks;
 }
 
