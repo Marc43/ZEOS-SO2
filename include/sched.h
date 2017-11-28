@@ -11,6 +11,14 @@
 
 #define NR_TASKS      10
 #define KERNEL_STACK_SIZE	1024
+#define NUM_SEMAPHORES 20
+
+struct semaphore {
+	int num_processes;
+	struct list_head blocked_processes;
+};
+
+struct semaphore sem_vector[NUM_SEMAPHORES];
 
 enum state_t { ST_RUN, ST_READY, ST_BLOCKED };
 

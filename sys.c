@@ -201,3 +201,20 @@ int sys_get_stats (int pid, struct stats *st){
 	else return -ESRCH;
 	return 0;
 }
+
+int sys_sem_init () {
+	//ebx: num_sem, ecx: value
+	return 1;	
+}
+
+int sys_sem_wait () {
+	return 1;
+}
+
+int sys_sem_signal () {
+	return 1;
+}
+
+int sys_sem_destroy () {
+	return 1;
+}
