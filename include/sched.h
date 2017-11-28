@@ -12,6 +12,11 @@
 #define NR_TASKS      10
 #define KERNEL_STACK_SIZE	1024
 
+struct info_dir {
+	unsigned int valid;
+	unsigned int shared;
+}
+
 enum state_t { ST_RUN, ST_READY, ST_BLOCKED };
 
 struct stats_s {
@@ -26,7 +31,7 @@ struct stats_s {
 
 struct task_struct {
   int PID;			/* Process ID. This MUST be the first field of the struct. */
-  page_table_entry * dir_pages_baseAddr;
+  page_table_entry* dir_pages_baseAddr;
   
   unsigned int kernel_esp; //To undo the dynamic link and some black magic
   unsigned int quantum;
@@ -36,6 +41,9 @@ struct task_struct {
   struct list_head list; 
 
   struct stats_s stats;
+
+  struct info_dir* info_dir_;
+
 };
 
 union task_union {

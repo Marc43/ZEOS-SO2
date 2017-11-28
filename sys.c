@@ -61,7 +61,8 @@ int sys_fork()
 		//The size of the union is the max(task_struct, stack)	
 		copy_data(parent_union, child_union, sizeof(union task_union));
 
-		allocate_DIR(&(child_union->task)); //Does not contemplate any error...
+		int check_error = allocate_DIR(&(child_union->task));
+		if (!check_error) return check_error;
 	} 
   	else {
 		printk("Insert an error code, that means there are no more pcb's");
@@ -193,6 +194,8 @@ int sys_clone (void (*function)(void), void* stack) {
 	//Check if "stack" exists, "function"... etc... TODO How?
 	
 	if (!list_empty(&freequeue)) {	
+		//TODO Check if stacks is accessible! access_ok!	
+
 		struct list_head* lh = list_first (&freequeue);
 		list_del(lh);
 		
@@ -200,6 +203,7 @@ int sys_clone (void (*function)(void), void* stack) {
 		union task_union* 	thread = (union task_union*) task_thread;
 		union task_union*	current_tasku = (union task_union*) current();
 
+	//TODO Update shared++	(thread->info_dir_)= 
 		thread->task.dir_pages_baseAddr = current_tasku->task.dir_pages_baseAddr;
 		thread->task.kernel_esp = &(thread->stack[1023-17]); 
 		thread->task.PID = last_PID++;

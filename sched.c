@@ -14,6 +14,8 @@
 unsigned long last_PID = 0;
 unsigned int ticks_rr = 10;
 
+struct info_dir dir_ [TOTAL_PAGES];
+
 union task_union protected_tasks[NR_TASKS+2]
   __attribute__((__section__(".data.task")));
 
@@ -42,11 +44,18 @@ page_table_entry * get_PT (struct task_struct *t)
 
 int allocate_DIR(struct task_struct *t) 
 {
-	int pos; //TODO Adapt allocate_DIR to thread implementation
+	int i = 0; int control;
+	while (control > 0 && i < TOTAL_PAGES) { 
+		++i;
+		if (dir_ [i].valid == 0) control = -1;
+	}
+	if (i >= TOTAL_PAGES) return -ENOMEM; 
 
-	pos = ((int)t-(int)task)/sizeof(union task_union);
+	dir_ [i].valid = 1;
+	dir_ [i].shared = 1;
 
-	t->dir_pages_baseAddr = (page_table_entry*) &dir_pages[pos]; 
+	t->info_dir_ = &(dir_ [i]);	
+	t->dir_pages_baseAddr = (page_table_entry*) &dir_pages[i]; 
 
 	return 1;
 }
