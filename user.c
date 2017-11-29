@@ -2,7 +2,7 @@
 
 int pid;
 
-char buff[128] = "Clone fucking worked!";
+char buff[128] = "Clone worked!";
 
 void dummy_function () {
 	write(1, &buff[0], strlen(buff));
@@ -16,8 +16,10 @@ int __attribute__ ((__section__(".text.main")))
      /* __asm__ __volatile__ ("mov %0, %%cr3"::"r" (0) ); */
 
 	char* k [1024];
-	clone((unsigned long*) dummy_function, &k[0]);
+	clone((unsigned long*) dummy_function, &k[1023]);
 	
-	while(1) {}	
+	while(1) {
+
+	}	
 }
 

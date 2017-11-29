@@ -14,8 +14,8 @@
 
 struct info_dir {
 	unsigned int valid;
-	unsigned int shared;
-}
+	unsigned int num_of;
+};
 
 enum state_t { ST_RUN, ST_READY, ST_BLOCKED };
 

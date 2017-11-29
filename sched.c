@@ -14,7 +14,7 @@
 unsigned long last_PID = 0;
 unsigned int ticks_rr = 10;
 
-struct info_dir dir_ [TOTAL_PAGES];
+struct info_dir dir_ [NR_TASKS];
 
 union task_union protected_tasks[NR_TASKS+2]
   __attribute__((__section__(".data.task")));
@@ -45,14 +45,14 @@ page_table_entry * get_PT (struct task_struct *t)
 int allocate_DIR(struct task_struct *t) 
 {
 	int i = 0; int control;
-	while (control > 0 && i < TOTAL_PAGES) { 
-		++i;
+	while (control > 0 && i < NR_TASKS) { 
+		++i; //idle is not going to get dir, so, first inc
 		if (dir_ [i].valid == 0) control = -1;
 	}
-	if (i >= TOTAL_PAGES) return -ENOMEM; 
+	if (i >= NR_TASKS) return -1; 
 
 	dir_ [i].valid = 1;
-	dir_ [i].shared = 1;
+	dir_ [i].num_of = 1;
 
 	t->info_dir_ = &(dir_ [i]);	
 	t->dir_pages_baseAddr = (page_table_entry*) &dir_pages[i]; 
@@ -165,7 +165,7 @@ void task_switch (union task_union* t) {
 void inner_task_switch (union task_union* t) {	
 //	unsigned int old_esp = current()->kernel_esp;
 	//tss.esp0 = task[t->task.PID].stack[1023]; //Update the TSS...
-	tss.esp0 = &(t->stack[1023]);
+	tss.esp0 = &(t->stack[KERNEL_STACK_SIZE-1]);
 	set_cr3 (t->task.dir_pages_baseAddr); //Set the new page directory (intel will erase TLB)
 //	unsigned int new_esp = t->task.kernel_esp; //The new_esp will be pointing straight to kernel_esp
 	ticks_rr = t->task.quantum = 10; //Ten ticks by default 

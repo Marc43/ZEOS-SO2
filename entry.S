@@ -49,12 +49,9 @@
       pushl %ebx; \
       movl $__KERNEL_DS, %edx;    \
       movl %edx, %ds;           \
-      movl %edx, %es
+      movl %edx, %es;			\
 
 #define RESTORE_ALL \
-      movl $__USER_DS, %edx; \
-      movl %edx, %ds; \
-      movl %edx, %es; \
       popl %ebx; \
       popl %ecx; \
       popl %edx; \
@@ -65,7 +62,7 @@
       popl %ds;  \
       popl %es;  \
       popl %fs;  \
-      popl %gs;  
+      popl %gs;  \ 
 
 #define EOI \
       movb $0x20, %al; \

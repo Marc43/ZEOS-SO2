@@ -134,12 +134,12 @@ int sys_fork()
 	//We could also take the ebp of the parent
 	//And just: ebp >> 4 (number of elements in the stack)
 	//stack [1023 - (ebp >> 4)]
-	child_union->task.kernel_esp = &(child_union->stack [1023-18]);	
-	child_union->stack[1023-17] = (unsigned long *)&ret_from_fork;
+	child_union->task.kernel_esp = &(child_union->stack [KERNEL_STACK_SIZE-19]);	
+	child_union->stack[KERNEL_STACK_SIZE-18] = (unsigned long *)&ret_from_fork;
 
 	list_add_tail(&(child_union->task.list), &readyqueue);
 
-	return PID;
+	return last_PID-1;
 }
 
 void sys_exit() {
@@ -147,13 +147,17 @@ void sys_exit() {
 	//We have to free the frames, and 're'-queue the PCB
 	page_table_entry* PT = get_PT(in_cpu);
 
-	//list_del(&(in_cpu->list)); This process is actually running, so is not within any list
-
-	int i;
-	for (i = NUM_PAG_KERNEL+NUM_PAG_CODE; i < NUM_PAG_KERNEL+NUM_PAG_CODE+NUM_PAG_DATA; ++i) 
+	in_cpu->info_dir_->num_of--;
+	if (in_cpu->info_dir_->num_of <= 0) {
+		in_cpu->info_dir_->valid = 0;
+		
+		int i;
+		for (i = NUM_PAG_KERNEL+NUM_PAG_CODE; i < NUM_PAG_KERNEL+NUM_PAG_CODE+NUM_PAG_DATA; ++i) 
 		free_frame (get_frame(PT, i));	
+		
+	}
 
-	//ALliberar PCB (encuar cua FREES);	
+	//Alliberar PCB (encuar cua FREES);	
 	list_del(&(in_cpu->list));
 	
 	sched_next_rr();
@@ -191,10 +195,10 @@ int sys_gettime () {
 
 int sys_clone (void (*function)(void), void* stack) {
 
-	//Check if "stack" exists, "function"... etc... TODO How?
-	
+	if (!(access_ok(VERIFY_WRITE, stack, 4) && access_ok(VERIFY_READ, function, 4))) 	return -EFAULT;
+
+
 	if (!list_empty(&freequeue)) {	
-		//TODO Check if stacks is accessible! access_ok!	
 
 		struct list_head* lh = list_first (&freequeue);
 		list_del(lh);
@@ -202,30 +206,29 @@ int sys_clone (void (*function)(void), void* stack) {
 		struct task_struct* task_thread = list_head_to_task_struct (lh);
 		union task_union* 	thread = (union task_union*) task_thread;
 		union task_union*	current_tasku = (union task_union*) current();
+		struct list_head	original_list = task_thread->list;
 
-	//TODO Update shared++	(thread->info_dir_)= 
-		thread->task.dir_pages_baseAddr = current_tasku->task.dir_pages_baseAddr;
-		thread->task.kernel_esp = &(thread->stack[1023-17]); 
+		copy_data(current_tasku, thread, sizeof(union task_union));
+
+		thread->task.list = original_list; 
+		thread->task.kernel_esp = &(thread->stack[KERNEL_STACK_SIZE-18]); 
 		thread->task.PID = last_PID++;
+		thread->task.state = ST_READY;
+		thread->task.info_dir_->num_of++; //Update the number of proccesses on that directory...		
 		
-		//Supposing that we have to 'push' the processor state...
-		//TODO Use Copydata, does exactly the same!
-		int i = 0;
-		for (i = 0; i < 16; ++i) //sixteen is the size of the state
-			thread->stack[1023-i] = current_tasku->stack[1023-i];
-
-		unsigned long* user_bottom = &(stack[1023]);
-		//TODO Check all the stack positions...
-		thread->stack[1006] = user_bottom;
-		thread->stack[1007] = function;
-	
+		thread->stack[KERNEL_STACK_SIZE-2 ] = stack; 
+		thread->stack[KERNEL_STACK_SIZE-11] = stack;
+		thread->stack[KERNEL_STACK_SIZE-5 ] = function;
+		thread->stack[KERNEL_STACK_SIZE-18] = 0xaaaa;
+		thread->stack[KERNEL_STACK_SIZE-17] = &ret_from_fork;
+						
 		list_add_tail(&(thread->task.list), &readyqueue);
 
-		return last_PID;
+		return last_PID-1;
 	}
 	else {
 		printk ("No more PCB's free, output an error (Errno)");
-		return -1;
+		return -ENOMEM;
 	}
 
 	return -1;
