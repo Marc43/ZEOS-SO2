@@ -79,7 +79,7 @@ int write (int fd, char* buffer, int size) {
 }
 
 int gettime () {
-	unsigned long int ret = 0;
+	long int ret = 0;
 	__asm__ __volatile__ ("movl $10, %%eax;"
 					      "int $0x80;"
 						  "movl %%eax, %0;"
@@ -96,7 +96,7 @@ int gettime () {
 }
 
 int getpid () {
-	unsigned long int ret = 0;
+	long int ret = 0;
 	__asm__ __volatile__ ("movl $20, %%eax;"
 						  "int $0x80;"
 						  "movl %%eax, %0;"
@@ -113,7 +113,7 @@ int getpid () {
 }
 
 int fork () {
-	unsigned long int ret = 0;
+	long int ret = 0;
 	__asm__ __volatile__ ("movl $2, %%eax;"
 						  "int $0x80;"
 					      "movl %%eax, %0;" //At this point, child and parent will have different return values
@@ -130,7 +130,7 @@ int fork () {
 }
 
 void exit () {
-	unsigned long int ret = 0;
+	long int ret = 0;
 	__asm__ __volatile__ ("movl $1, %%eax;"
 						  "int $0x80;"
 						  "movl %%eax, %0;"
@@ -145,7 +145,7 @@ void exit () {
 }
 
 int clone (void (*function) (void), void *stack) {
-	unsigned long int ret;
+	long int ret;
 	__asm__ __volatile__ ("movl $19, %%eax;"
 						  "int $0x80;"
 						  "movl %%eax, %0;"

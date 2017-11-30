@@ -206,11 +206,9 @@ int sys_clone (void (*function)(void), void* stack) {
 		struct task_struct* task_thread = list_head_to_task_struct (lh);
 		union task_union* 	thread = (union task_union*) task_thread;
 		union task_union*	current_tasku = (union task_union*) current();
-		struct list_head	original_list = task_thread->list;
 
-		copy_data(current_tasku, thread, sizeof(union task_union));
+		copy_data(current_tasku, thread, sizeof(int)*KERNEL_STACK_SIZE);
 
-		thread->task.list = original_list; 
 		thread->task.kernel_esp = &(thread->stack[KERNEL_STACK_SIZE-18]); 
 		thread->task.PID = last_PID++;
 		thread->task.state = ST_READY;
@@ -221,7 +219,7 @@ int sys_clone (void (*function)(void), void* stack) {
 		thread->stack[KERNEL_STACK_SIZE-5 ] = function;
 		thread->stack[KERNEL_STACK_SIZE-18] = 0xaaaa;
 		thread->stack[KERNEL_STACK_SIZE-17] = &ret_from_fork;
-						
+					
 		list_add_tail(&(thread->task.list), &readyqueue);
 
 		return last_PID-1;
