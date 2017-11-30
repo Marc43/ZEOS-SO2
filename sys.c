@@ -135,10 +135,22 @@ int sys_fork()
 	//stack [1023 - (ebp >> 4)]
 	child_union->task.kernel_esp = &(child_union->stack [1023-18]);	
 	child_union->stack[1023-17] = (unsigned long *)&ret_from_fork;
-
+	
+	// Init estadisticas
+	child_union->task.stats.user_ticks = 0;
+	child_union->task.stats.system_ticks = 0;
+	child_union->task.stats.blocked_ticks = 0;
+	child_union->task.stats.ready_ticks = 0;
+	child_union->task.stats.total_trans = 0;
+	child_union->task.stats.remaining_ticks = 0;
+	child_union->task.stats.elapsed_total_ticks = get_ticks();
+	
+	//Ponemos el proceso hijo en estado READY
+	child_union->task.state = ST_READY;
+	//y lo ponemos en la cola de ready's
 	list_add_tail(&(child_union->task.list), &readyqueue);
 
-	return last_PID;
+	return last_PID; //Se devuelve el siquiente PID que se puede usar
 }
 
 void sys_exit() {
