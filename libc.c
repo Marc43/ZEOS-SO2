@@ -134,14 +134,14 @@ void exit () {
 	__asm__ __volatile__ ("movl $1, %%eax;"
 						  "int $0x80;"
 						  "movl %%eax, %0;"
-						  : "=m" (ret)
+						  :"=m" (ret) 
 						  : 
 						  : "eax");
 
-	if (ret < 0) {
+/*	if (ret < 0) {
 		errno = -ret;
 	}
-
+*/
 }
 
 int get_stats (int pid, struct stats *st){

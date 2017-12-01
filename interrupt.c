@@ -113,17 +113,9 @@ int read_keyboard(unsigned char* letter) {
 extern struct task_struct *idle_task;
 
 void clock_routine (){
-/*	
-	current()->stats.user_ticks += get_ticks()-current()->stats.elapsed_total_ticks;
-	current()->stats.elapsed_total_ticks = get_ticks();
-*/	
 	++zeos_ticks; //Ticks
 	zeos_show_clock();
  	schedule();
-/*
-	current()->stats.system_ticks += get_ticks()-current()->stats.elapsed_total_ticks;
-	current()->stats.elapsed_total_ticks = get_ticks();
-*/
 }
 
 void keyboard_routine () {
