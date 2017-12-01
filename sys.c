@@ -207,16 +207,16 @@ int sys_clone (void (*function)(void), void* stack) {
 		union task_union* 	thread = (union task_union*) task_thread;
 		union task_union*	current_tasku = (union task_union*) current();
 
-		copy_data(current_tasku, thread, sizeof(int)*KERNEL_STACK_SIZE);
+		copy_data(&(current_tasku->stack[0]), &(thread->stack[0]), sizeof(union task_union));
 
 		thread->task.kernel_esp = &(thread->stack[KERNEL_STACK_SIZE-18]); 
 		thread->task.PID = last_PID++;
 		thread->task.state = ST_READY;
 		thread->task.info_dir_->num_of++; //Update the number of proccesses on that directory...		
 		
-		thread->stack[KERNEL_STACK_SIZE-2 ] = stack; 
+		thread->stack[KERNEL_STACK_SIZE-2] = stack; 
 		thread->stack[KERNEL_STACK_SIZE-11] = stack;
-		thread->stack[KERNEL_STACK_SIZE-5 ] = function;
+		thread->stack[KERNEL_STACK_SIZE-5] = function;
 		thread->stack[KERNEL_STACK_SIZE-18] = 0xaaaa;
 		thread->stack[KERNEL_STACK_SIZE-17] = &ret_from_fork;
 					

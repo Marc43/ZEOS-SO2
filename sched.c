@@ -93,7 +93,6 @@ void init_idle (void) {
 }
 
 void init_task1(void) {
-	//la lista esta fallando, poner el proceso de run a cola
 	if (!list_empty(&freequeue)) {
 		struct list_head* lh = list_first (&freequeue);
 		list_del(lh); 	
@@ -103,9 +102,9 @@ void init_task1(void) {
 		allocate_DIR(task1);
 		set_user_pages(task1); //Initialize pages for task1
 		set_cr3(task1->dir_pages_baseAddr);
-		tss.esp0 = &(task[task1->PID].stack[1023]);
-
-		list_add_tail(&(task1->list), &readyqueue); // **
+		
+		union task_union* tu = (union task_union*)task1;
+		tss.esp0 = &(tu->stack[KERNEL_STACK_SIZE]);
 	
 		task1->state = ST_RUN;
 		update_process_state_rr(task1, NULL); //Kind of useless (**)
@@ -165,10 +164,10 @@ void task_switch (union task_union* t) {
 void inner_task_switch (union task_union* t) {	
 //	unsigned int old_esp = current()->kernel_esp;
 	//tss.esp0 = task[t->task.PID].stack[1023]; //Update the TSS...
-	tss.esp0 = &(t->stack[KERNEL_STACK_SIZE-1]);
+	tss.esp0 = &(t->stack[KERNEL_STACK_SIZE]);
 	set_cr3 (t->task.dir_pages_baseAddr); //Set the new page directory (intel will erase TLB)
 //	unsigned int new_esp = t->task.kernel_esp; //The new_esp will be pointing straight to kernel_esp
-	ticks_rr = t->task.quantum = 10; //Ten ticks by default 
+	ticks_rr = t->task.quantum; //Ten ticks by default 
 	__asm__ __volatile__ ( 	"movl %%ebp, %0;" 
 						    "movl %1, %%esp;"
 							"popl %%ebp;"
@@ -194,32 +193,14 @@ int needs_sched_rr () {
 void update_process_state_rr (struct task_struct *t, struct list_head *dst_queue) {
 	//enum state_t s = t->state;
 	struct list_head* lh = &(t->list);
-	/*	switch (s) {
-			case ST_RUN :
-				list_del(lh);
-				
-				break;
-			case ST_READY :
-				list_add_tail(lh, dst_queue);
-				
-				break;
-
-			case ST_BLOCKED :
-				list_add_tail(lh, dst_queue);
-				
-				break;
-	}*/
 
 	if (dst_queue == NULL) {
 		//Means that t must RUN
 		t->state = ST_RUN;
-		list_del(lh);
-		
 	}
 	else {
 		t->state = ST_READY;
-		list_add_tail(lh, dst_queue); //By the moment only ready
-	
+		list_add_tail(lh, dst_queue); //By the moment only ready	
 	}
 }
 
