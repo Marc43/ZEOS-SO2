@@ -31,7 +31,7 @@ SYSOBJ = interrupt.o entry.o sys_call_table.o io.o sched.o sys.o mm.o devices.o 
 LIBZEOS = -L . -l zeos
 
 #add to USROBJ the object files required to complete the user program
-USROBJ = libc.o # libjp.a
+USROBJ = libc.o libjp.a
 
 all:zeos.bin
 
