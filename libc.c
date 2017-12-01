@@ -79,7 +79,7 @@ int write (int fd, char* buffer, int size) {
 }
 
 int gettime () {
-	unsigned long int ret = 0;
+	int ret = 0;
 	__asm__ __volatile__ ("movl $10, %%eax;"
 					      "int $0x80;"
 						  "movl %%eax, %0;"
@@ -96,7 +96,7 @@ int gettime () {
 }
 
 int getpid () {
-	unsigned long int ret = 0;
+	int ret = 0;
 	__asm__ __volatile__ ("movl $20, %%eax;"
 						  "int $0x80;"
 						  "movl %%eax, %0;"
@@ -113,7 +113,7 @@ int getpid () {
 }
 
 int fork () {
-	unsigned long int ret = 0;
+	int ret = 0;
 	__asm__ __volatile__ ("movl $2, %%eax;"
 						  "int $0x80;"
 					      "movl %%eax, %0;" //At this point, child and parent will have different return values
@@ -134,24 +134,24 @@ void exit () {
 	__asm__ __volatile__ ("movl $1, %%eax;"
 						  "int $0x80;"
 						  "movl %%eax, %0;"
-						  : "=m" (ret)
+						  :"=m" (ret) 
 						  : 
 						  : "eax");
 
-	if (ret < 0) {
+/*	if (ret < 0) {
 		errno = -ret;
 	}
-
+*/
 }
 
 int get_stats (int pid, struct stats *st){
-	unsigned long int ret = 0;				// Identificador de llamada a sistema: 35
+	int ret = 0;				// Identificador de llamada a sistema: 35
 	__asm__ __volatile__ ("movl 	$35, %%eax;"
 			      "int 	$0x80;"
 			      "movl 	%%eax, %0;"
-			      : "=m" (ret), "+b" (pid), "+c" (st)
-			      :
-			      : "eax" );
+			      : "=m" (ret)
+			      : "b" (pid), "c" (st)
+			      : "eax");
 	if (ret < 0){
 		errno = -ret;
 		ret = -1;

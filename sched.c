@@ -79,8 +79,20 @@ void init_idle (void) {
 		idle_union->stack[KERNEL_STACK_SIZE-1] = (unsigned long)&cpu_idle;
 		idle_union->stack[KERNEL_STACK_SIZE-2] = 0;
 		idle->kernel_esp = &(idle_union->stack [KERNEL_STACK_SIZE - 2]);
+		
+		idle->quantum = QUANTUM;
+		
+		//Estadisticas del proceso Idle
+		idle->stats.user_ticks = 0;
+		idle->stats.system_ticks = 0;
+	 	idle->stats.blocked_ticks = 0;
+		idle->stats.ready_ticks = 0;
+		idle->stats.total_trans = 0;
+		idle->stats.remaining_ticks = 0;
+		idle->stats.elapsed_total_ticks = get_ticks();
 	}
 	//else (Doesn't make sense, there will be free PCB's always...)
+
 }
 
 void init_task1(void) {
@@ -94,14 +106,22 @@ void init_task1(void) {
 		set_user_pages(task1); //Initialize pages for task1
 		set_cr3(task1->dir_pages_baseAddr);
 		union task_union* task1_union = (union task_union*)(task1);
-		tss.esp0 = &(task1_union->stack[1023]);
-	
-		update_process_state_rr(task1, NULL); 
-		
-		task1->quantum = 100;	
+		tss.esp0 = &(task1_union->stack[1023]); 	
 	
 		task1->kernel_esp = tss.esp0; //At the start, they point to the same memory position 
 		
+		set_quantum(&task1,QUANTUM);
+		
+		//Estadisticas del proceso task1
+		task1->stats.user_ticks = 0;
+		task1->stats.system_ticks = 0;
+	 	task1->stats.blocked_ticks = 0;
+		task1->stats.ready_ticks = 0;
+		task1->stats.total_trans = 0;
+		task1->stats.remaining_ticks = QUANTUM;
+		task1->stats.elapsed_total_ticks = get_ticks();
+		
+		update_process_state_rr(task1, NULL);
 	}
 }
 
@@ -156,7 +176,7 @@ void inner_task_switch (union task_union* t) {
 	tss.esp0 = &(t->stack[1023]);
 	set_cr3 (t->task.dir_pages_baseAddr); //Set the new page directory (intel will erase TLB)
 //	unsigned int new_esp = t->task.kernel_esp; //The new_esp will be pointing straight to kernel_esp
-	ticks_rr = t->task.quantum = 10; //Ten ticks by default 
+	ticks_rr = t->task.quantum; //Ten ticks by default 
 	__asm__ __volatile__ ( 	"movl %%ebp, %0;" 
 						    "movl %1, %%esp;"
 							"popl %%ebp;"
@@ -168,15 +188,15 @@ void inner_task_switch (union task_union* t) {
 }
 
 void update_sched_data_rr () {
+	current()->stats.remaining_ticks--;
 	ticks_rr--; //I update the total of ticks executed by the current process
 }
 
 int needs_sched_rr () {
-	if (ticks_rr == 0 || (current()->PID == 0 && !list_empty(&readyqueue))) { //When we take all the quantum or the current process is the idle task and there is a process ready to be executed
-		return 1;
-	}
-
-	return 0;
+	//When we take all the quantum or the current process is the idle task and there is a process ready to be executed
+	
+	if (ticks_rr == 0 || (current()->PID == 0 && !list_empty(&readyqueue))) return 1;
+	else return 0;
 }
 
 void update_process_state_rr (struct task_struct *t, struct list_head *dst_queue) {
@@ -186,34 +206,58 @@ void update_process_state_rr (struct task_struct *t, struct list_head *dst_queue
 		//Means that t must RUN
 		t->state = ST_RUN;
 	}
-	else {
+	else if (dst_queue == &freequeue){
+		t->state = 0;
+		list_add_tail(lh, dst_queue);	
+	}
+	else if (dst_queue == &readyqueue){
+		//Actualizacion de ESTADISTICAS del proceso actual (estadisticas RUN_system -> READY)
+		current()->stats.system_ticks += get_ticks()-current()->stats.elapsed_total_ticks;
+		current()->stats.elapsed_total_ticks = get_ticks();
+		
 		t->state = ST_READY;
 		list_add_tail(lh, dst_queue); //By the moment only ready
 	}
+	
 }
 
 void sched_next_rr () {
 	if (!list_empty(&readyqueue)) {
-		current()->stats.system_ticks += get_ticks()-current()->stats.elapsed_total_ticks;
-		current()->stats.elapsed_total_ticks = get_ticks();		
+		// En este punto tenemos el proceso actual (current) que hay que quitarlo de la CPU y 
+		// volver a ponerlo en la cola de ready's
+		
+	
+		//Lo ponemos en la cola de ready's
+//		if (current()->PID != -1) update_process_state_rr(current(), &readyqueue);
+		
+		/** Nuevo proceso que entrará en ejecución **/
 
-		//To run
+		//Cogemos el primer proceso de la cola de ready's
 		struct list_head* lh = list_first(&readyqueue);
+		//Obtenemos su task_struct (PCB)
 		struct task_struct* new = list_head_to_task_struct(lh);
+		
 		list_del(lh); //Extract the process from the queue
-
-		update_process_state_rr(new, NULL);
-
-		update_process_state_rr(current(), &readyqueue);	
+	
+		//Actualización de ESTADISTICAS del nuevo proceso (estadisticas READY -> RUN_system)
+		new->stats.ready_ticks += get_ticks()-new->stats.elapsed_total_ticks;
+		new->stats.elapsed_total_ticks = get_ticks();
+		new->stats.remaining_ticks = get_quantum(&new);
+		new->stats.total_trans++;
 		
+		//Cambio de estado del nuevo proceso a ST_RUN
+	//	update_process_state_rr(new, NULL);
+		new->state = ST_RUN;
+		//Actualización de tiempos
+//		new->quantum = QUANTUM;	// El nuevo proceso entra a CPU con quantum nuevo
+//		ticks_rr = get_quantum(&new);
+				
+		//Ponemos el nuevo proceso a ejecutar			
 		task_switch((union task_union*) new);	
-		
-		current()->stats.ready_ticks += get_ticks()-current()->stats.elapsed_total_ticks;
-		current()->stats.elapsed_total_ticks = get_ticks();
+		set_quantum(current(),QUANTUM);
 	}
-	else {
-		task_switch((union task_union*) idle_task);
-	}
+	
+	else task_switch((union task_union*) idle_task);
 }
 
 int get_quantum (struct task_struct *t) {
@@ -225,36 +269,12 @@ void set_quantum (struct task_struct *t, int new_quantum) {
 }
 
 void schedule () {
+	//Actualiza ticks_rr (decrementa en 1)
 	update_sched_data_rr();
+	// Comprueba si hay que hacer un cambio de proceso
 	if (needs_sched_rr()) {
 		sched_next_rr();
 	}
 }
 
-struct task_struct *getPCBfromPID (int pid, struct list_head *queue){
-	struct task_struct *pcb;
 
-	if (current()->PID == pid) return current();
-	else if (!list_empty (queue)){
-		// Obtengo el primer elemento de la cola
-		struct list_head *first = list_first (queue);
-		pcb = list_head_to_task_struct(first);
-		if (pcb->PID == pid) return pcb;
-		// Saco el primer elmento (first) y lo vuelvo a insertar 
-		// al final de la cola
-		list_del (queue);
-		list_add_tail(first, queue);
-
-		struct list_head *elementoActual = list_first(queue);
-
-		while (first != elementoActual){
-			pcb = list_head_to_task_struct(elementoActual);
-			if (pcb->PID == pid) return pcb;
-			list_del (queue);
-			list_add_tail (elementoActual, queue);
-			elementoActual = list_first(queue);
-		}
-	}
-
-	return NULL;
-}
