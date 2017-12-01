@@ -114,6 +114,7 @@ void init_sched(){
 	init_ready_queue();
 	init_idle();
 	init_task1();
+	init_semaphores();
 }
 
 struct task_struct* current()
@@ -207,10 +208,14 @@ void update_process_state_rr (struct task_struct *t, struct list_head *dst_queue
 		list_del(lh);
 		
 	}
-	else {
+	else if (dst_queue == &(readyqueue)) {
 		t->state = ST_READY;
 		list_add_tail(lh, dst_queue); //By the moment only ready
 	
+	}
+	else {
+		t->state = ST_BLOCKED;
+		list_add_tail(lh, dst_queue);
 	}
 }
 
@@ -279,4 +284,14 @@ struct task_struct *getPCBfromPID (int pid, struct list_head *queue){
 		}
 	}
 	return NULL;
+}
+
+void init_semaphores() {
+	int i;
+	for (i = 0; i < NUM_SEMAPHORES; ++i) {
+		sem_vector [i].num_processes = -1;
+		INIT_LIST_HEAD(&(sem_vector[i].blocked_processes));	
+	}
+
+	return ;
 }

@@ -105,4 +105,5 @@ void init_free_queue();
 
 void init_ready_queue();
 
+void init_semaphores();
 #endif  /* __SCHED_H__ */

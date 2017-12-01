@@ -202,19 +202,57 @@ int sys_get_stats (int pid, struct stats *st){
 	return 0;
 }
 
-int sys_sem_init () {
+int sys_sem_init (int n_sem, int value) {
 	//ebx: num_sem, ecx: value
-	return 1;	
+	//Creates a new semaphore with num: num_sem && blocked queue size: value
+	if (n_sem >= 20) return -EINVAL;
+
+	if (sem_vector [n_sem].num_processes == -1) {
+		sem_vector [n_sem].num_processes = value;
+		//We do nothing with the blocked queue by the moment...
+	}
+	else { 
+		printk("That semaphore already exists!");
+		
+		return -EINVAL;
+	}
+
+	return 0;	
 }
 
-int sys_sem_wait () {
-	return 1;
+int sys_sem_wait (int n_sem) {
+	if (n_sem >= 20) return -EINVAL;
+
+	if (sem_vector [n_sem].num_processes == -1) return -EINVAL;
+
+	struct task_struct* caller = current();
+	if (sem_vector [n_sem].num_processes <= 0) {
+		//Whops, someone must be blocked
+		update_process_state_rr(caller, (&(sem_vector [n_sem].blocked_processes)));
+	}
+	else
+		sem_vector [n_sem].num_processes--;
+		
+	return 0;
 }
 
-int sys_sem_signal () {
-	return 1;
+int sys_sem_signal (int n_sem) {
+	if (n_sem >= 20) return -EINVAL;
+
+	if (sem_vector [n_sem] == -1) return -EINVAL;
+
+	if (sem_vector [n_sem].num_processes == 0)
+		sem_vector [n_sem].num_processes++;
+	else {
+		sem_vector [n_sem].num_processes--;
+		
+	}
+
+
+
+	return 0;
 }
 
 int sys_sem_destroy () {
-	return 1;
+	return 0;
 }
