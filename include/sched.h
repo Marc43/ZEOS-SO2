@@ -11,6 +11,16 @@
 
 #define NR_TASKS      10
 #define KERNEL_STACK_SIZE	1024
+#define NUM_SEMAPHORES 20
+
+struct semaphore {
+	int owner_pid;
+	unsigned int num_blocked;
+	unsigned int max_blocked;
+	struct list_head blocked_processes;
+};
+
+struct semaphore sem_vector[NUM_SEMAPHORES];
 
 struct info_dir {
 	unsigned int valid;
@@ -105,4 +115,5 @@ void init_free_queue();
 
 void init_ready_queue();
 
+void init_semaphores();
 #endif  /* __SCHED_H__ */

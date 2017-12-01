@@ -122,6 +122,7 @@ void init_sched(){
 	init_ready_queue();
 	init_idle();
 	init_task1();
+	init_semaphores();
 }
 
 struct task_struct* current()
@@ -198,9 +199,13 @@ void update_process_state_rr (struct task_struct *t, struct list_head *dst_queue
 		//Means that t must RUN
 		t->state = ST_RUN;
 	}
-	else {
+	else if (dst_queue == &(readyqueue)) {
 		t->state = ST_READY;
 		list_add_tail(lh, dst_queue); //By the moment only ready	
+	}
+	else {
+		t->state = ST_BLOCKED;
+		list_add_tail(lh, dst_queue);
 	}
 }
 
@@ -242,4 +247,43 @@ void schedule () {
 	if (needs_sched_rr()) {
 		sched_next_rr();
 	}
+}
+
+struct task_struct *getPCBfromPID (int pid, struct list_head *queue){
+	struct task_struct *pcb;
+
+	if (current()->PID == pid) return current();
+	else if (!list_empty (queue)){
+		// Obtengo el primer elemento de la cola
+		struct list_head *first = list_first (queue);
+		pcb = list_head_to_task_struct(first);
+		if (pcb->PID == pid) return pcb;
+		// Saco el primer elmento (first) y lo vuelvo a insertar 
+		// al final de la cola
+		list_del (queue);
+		list_add_tail(first,queue);
+
+		struct list_head *elementoActual = list_first(queue);
+
+		while (first != elementoActual){
+			pcb = list_head_to_task_struct(elementoActual);
+			if (pcb->PID == pid) return pcb;
+			list_del (queue);
+			list_add_tail (elementoActual, queue);
+			elementoActual = list_first(queue);
+		}
+	}
+	return NULL;
+}
+
+void init_semaphores() {
+	int i;
+	for (i = 0; i < NUM_SEMAPHORES; ++i) {
+		sem_vector [i].owner_pid = -1;
+		sem_vector [i].num_blocked = 0;
+		sem_vector [i].max_blocked = 0;
+		INIT_LIST_HEAD(&(sem_vector[i].blocked_processes));	
+	}
+
+	return ;
 }

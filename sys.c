@@ -61,12 +61,11 @@ int sys_fork()
 		//The size of the union is the max(task_struct, stack)	
 		copy_data(parent_union, child_union, sizeof(union task_union));
 
-		int check_error = allocate_DIR(&(child_union->task));
-		if (!check_error) return check_error;
+		allocate_DIR(&(child_union->task)); //Does not contemplate any error...
 	} 
   	else {
 		printk("Insert an error code, that means there are no more pcb's");
-		
+	
 		return -ECHILD;	
 	}
 
@@ -83,9 +82,10 @@ int sys_fork()
 	
 	if (frame < 0) {
 		printk("Insert an error code, no more physical pages available");
-		
+	
 		int i = 0;
-        while (i < NUM_PAG_DATA && ph_pages [i] > 0)                  	free_frame(ph_pages [i]);
+        while (i < NUM_PAG_DATA && ph_pages [i] > 0)                  
+			free_frame(ph_pages [i]);
 
 		list_add_tail (&(child_union->task.list), &freequeue); //Free frames and restore pcb            
         //Is the allocated DIR someway attached to the PCB????
@@ -163,36 +163,6 @@ void sys_exit() {
 	sched_next_rr();
 }
 
-int sys_write (int fd, char* buffer, int size) {
-	char mkernel_buff[4];
-    int bytesWritten = 0;
-	int error = check_fd (fd, 1);
-	
-	if (error != 0) return error;
-	if (buffer == NULL) return -EINVAL;
-	if (size <= 0) return -EINVAL;
-	if (access_ok(VERIFY_READ, buffer, size) == 0) return -EACCES;
-	
-    // traspaso de bloques de 4 en 4 bytes
-    for (;size > 4; buffer +=  4, size -= 4){
-		copy_from_user(buffer, mkernel_buff, 4);
-		bytesWritten += sys_write_console(mkernel_buff,4);
-	}
-            
-    // traspaso del resto del buffer
-    if (size != 0){
-	    copy_from_user(buffer, mkernel_buff, size);
-	    bytesWritten += sys_write_console(mkernel_buff,size);
-    }
- 
-    return bytesWritten;    // Devuelve el num. de bytes escritos
-}
-
-int sys_gettime () {
-	
-	return zeos_ticks;
-}
-
 int sys_clone (void (*function)(void), void* stack) {
 
 	if (!(access_ok(VERIFY_WRITE, stack, 4) && access_ok(VERIFY_READ, function, 4))) 	return -EFAULT;
@@ -230,4 +200,116 @@ int sys_clone (void (*function)(void), void* stack) {
 	}
 
 	return -1;
+}
+
+int sys_write (int fd, char* buffer, int size) {
+	char mkernel_buff[4];
+    int bytesWritten = 0;
+	int error = check_fd (fd, 1);
+	
+	if (error != 0) return error;
+	if (buffer == NULL) return -EINVAL;
+	if (size <= 0) return -EINVAL;
+	if (access_ok(VERIFY_READ, buffer, size) == 0) return -EACCES;
+	
+    // traspaso de bloques de 4 en 4 bytes
+    for (;size > 4; buffer +=  4, size -= 4){
+		copy_from_user(buffer, mkernel_buff, 4);
+		bytesWritten += sys_write_console(mkernel_buff,4);
+	}
+            
+    // traspaso del resto del buffer
+    if (size != 0){
+	    copy_from_user(buffer, mkernel_buff, size);
+	    bytesWritten += sys_write_console(mkernel_buff,size);
+    }
+ 
+    return bytesWritten;    // Devuelve el num. de bytes escritos
+}
+
+int sys_gettime () {
+	
+	return zeos_ticks;
+}
+
+int sys_get_stats (int pid, struct stats *st){
+	struct task_struct *ts;
+	
+	//Comprobaciones
+	if (access_ok(VERIFY_WRITE,st,56) == 0) return -EACCES;
+	
+	//Busqueda del PCB
+	ts = getPCBfromPID (pid, &readyqueue);
+	if (ts != NULL ) copy_to_user(&ts->stats, st, 56);
+
+	else return -ESRCH;
+	return 0;
+}
+
+int sys_sem_init (int n_sem, int value) {
+	//ebx: num_sem, ecx: value
+	//Creates a new semaphore with num: num_sem && blocked queue size: value
+	if (n_sem >= 20) return -EINVAL;
+
+	if (sem_vector [n_sem].owner_pid == -1) {
+		sem_vector [n_sem].max_blocked = value;
+		sem_vector [n_sem].num_blocked = 0;
+		//We do nothing with the blocked queue by the moment...
+	}
+	else { 
+		printk("That semaphore already exists!");
+		
+		return -EINVAL;
+	}
+
+	return 0;	
+}
+
+int sys_sem_wait (int n_sem) {
+	if (n_sem >= 20) return -EINVAL;
+
+	if (sem_vector [n_sem].owner_pid == -1) return -EINVAL;
+
+	if (sem_vector [n_sem].num_blocked <= 0) {
+		//Whops, someone must be blocked
+		update_process_state_rr(current(), (&(sem_vector [n_sem].blocked_processes)));
+	}
+	else
+		sem_vector [n_sem].num_blocked--;
+		
+	return 0;
+}
+
+int sys_sem_signal (int n_sem) {
+	if (n_sem >= 20) return -EINVAL;
+
+	if (sem_vector [n_sem].owner_pid == -1) return -EINVAL;
+
+	if (sem_vector [n_sem].num_blocked == 0)
+		sem_vector [n_sem].num_blocked++;
+	else {
+		sem_vector [n_sem].num_blocked--;
+		struct list_head* lh = list_first(&(sem_vector [n_sem].blocked_processes));
+		struct task_struct* first = list_head_to_task_struct(lh);
+		update_process_state_rr(first, &readyqueue); //Unblock		
+	}
+
+	return 0;
+}
+
+int sys_sem_destroy (int n_sem) {
+	if (n_sem >= 20) return -EINVAL;
+
+	if (sem_vector [n_sem].owner_pid == -1) return -EINVAL;
+
+	if (sem_vector [n_sem].owner_pid == current()->PID) {
+		sem_vector [n_sem].owner_pid   = -1;
+		sem_vector [n_sem].max_blocked = 0;
+		INIT_LIST_HEAD(&(sem_vector [n_sem].blocked_processes));
+		//TODO Check this out..	
+	}
+	else 
+		return -EINVAL;
+
+	return 0;
 }

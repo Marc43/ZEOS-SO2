@@ -160,5 +160,88 @@ int clone (void (*function) (void), void *stack) {
 	}
 	
 	return ret;
+}
  
+int get_stats (int pid, struct stats *st) {
+	unsigned long int ret = 0;				// Identificador de llamada a sistema: 35
+	__asm__ __volatile__ ("movl 	$35, %%eax;"
+			      "int 	$0x80;"
+			      "movl 	%%eax, %0;"
+			      : "=m" (ret), "+b" (pid), "+c" (st)
+			      :
+			      : "eax" );
+	if (ret < 0){
+		errno = ret;
+		ret = -1;
+	}
+
+	return ret;
+}
+
+int sem_init (int n_sem, unsigned int value) {
+	unsigned long int ret = -1;
+	__asm__ __volatile__ ("movl $21, %%eax;"
+						  "int  $0x80;"
+                          "movl %%eax, %0;"
+             			  : "=m" (ret)
+						  : "b" (n_sem), "c" (value)
+                          : "eax");
+
+	if (ret < 0) {
+		errno = ret;
+		ret = -1;
+	}
+
+	return ret;
+}
+
+int sem_wait (int n_sem) {
+	unsigned long int ret = -1;
+	__asm__ __volatile__ ("movl $22, %%eax;"
+						  "int  $0x80;"
+                          "movl %%eax, %0;"
+             			  : "=m" (ret)
+						  : "b" (n_sem)
+                          : "eax");
+
+	if (ret < 0) {
+		errno = ret;
+		ret = -1;
+	}
+
+	return ret;
+}
+
+int sem_signal (int n_sem) {
+	unsigned long int ret = -1;
+	__asm__ __volatile__ ("movl $23, %%eax;"
+						  "int  $0x80;"
+                          "movl %%eax, %0;"
+             			  : "=m" (ret)
+						  : "b" (n_sem)
+                          : "eax");
+
+	if (ret < 0) {
+		errno = ret;
+		ret = -1;
+	}
+
+	return ret;
+}
+
+int sem_destroy (int n_sem) {
+	unsigned long int ret = -1;
+	__asm__ __volatile__ ("movl $24, %%eax;"
+						  "int  $0x80;"
+                          "movl %%eax, %0;"
+             			  : "=m" (ret)
+						  : "b" (n_sem)
+                          : "eax");
+
+	if (ret < 0) {
+		errno = ret;
+		ret = -1;
+	}
+
+	return ret;
 }
