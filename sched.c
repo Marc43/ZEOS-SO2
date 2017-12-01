@@ -12,7 +12,7 @@
  */
 
 unsigned long last_PID = 0;
-unsigned int ticks_rr = 10;
+unsigned int ticks_rr = QUANTUM;
 
 union task_union protected_tasks[NR_TASKS+2]
   __attribute__((__section__(".data.task")));
@@ -83,6 +83,7 @@ void init_idle (void) {
 		idle->quantum = QUANTUM;
 		
 		//Estadisticas del proceso Idle
+		idle->state = ST_READY; //??? No proper state ???
 		idle->stats.user_ticks = 0;
 		idle->stats.system_ticks = 0;
 	 	idle->stats.blocked_ticks = 0;
@@ -91,7 +92,6 @@ void init_idle (void) {
 		idle->stats.remaining_ticks = 0;
 		idle->stats.elapsed_total_ticks = get_ticks();
 	}
-	//else (Doesn't make sense, there will be free PCB's always...)
 
 }
 
@@ -106,11 +106,11 @@ void init_task1(void) {
 		set_user_pages(task1); //Initialize pages for task1
 		set_cr3(task1->dir_pages_baseAddr);
 		union task_union* task1_union = (union task_union*)(task1);
-		tss.esp0 = &(task1_union->stack[1023]); 	
+		tss.esp0 = &(task1_union->stack[KERNEL_STACK_SIZE]); 	
 	
 		task1->kernel_esp = tss.esp0; //At the start, they point to the same memory position 
 		
-		set_quantum(&task1,QUANTUM);
+		set_quantum(&task1, QUANTUM);
 		
 		//Estadisticas del proceso task1
 		task1->stats.user_ticks = 0;
@@ -124,7 +124,6 @@ void init_task1(void) {
 		update_process_state_rr(task1, NULL);
 	}
 }
-
 
 void init_sched(){
 	init_free_queue();
@@ -171,12 +170,9 @@ void task_switch (union task_union* t) {
 }
 
 void inner_task_switch (union task_union* t) {	
-//	unsigned int old_esp = current()->kernel_esp;
-	//tss.esp0 = task[t->task.PID].stack[1023]; //Update the TSS...
-	tss.esp0 = &(t->stack[1023]);
+	tss.esp0 = &(t->stack[KERNEL_STACK_SIZE]);
 	set_cr3 (t->task.dir_pages_baseAddr); //Set the new page directory (intel will erase TLB)
-//	unsigned int new_esp = t->task.kernel_esp; //The new_esp will be pointing straight to kernel_esp
-	ticks_rr = t->task.quantum; //Ten ticks by default 
+	ticks_rr = t->task.quantum;  
 	__asm__ __volatile__ ( 	"movl %%ebp, %0;" 
 						    "movl %1, %%esp;"
 							"popl %%ebp;"
@@ -193,8 +189,7 @@ void update_sched_data_rr () {
 }
 
 int needs_sched_rr () {
-	//When we take all the quantum or the current process is the idle task and there is a process ready to be executed
-	
+	//When we take all the quantum or the current process is the idle task and there is a process ready to be executed	
 	if (ticks_rr == 0 || (current()->PID == 0 && !list_empty(&readyqueue))) return 1;
 	else return 0;
 }
@@ -205,10 +200,6 @@ void update_process_state_rr (struct task_struct *t, struct list_head *dst_queue
 	if (dst_queue == NULL) {
 		//Means that t must RUN
 		t->state = ST_RUN;
-	}
-	else if (dst_queue == &freequeue){
-		t->state = 0;
-		list_add_tail(lh, dst_queue);	
 	}
 	else if (dst_queue == &readyqueue){
 		//Actualizacion de ESTADISTICAS del proceso actual (estadisticas RUN_system -> READY)
@@ -225,18 +216,12 @@ void sched_next_rr () {
 	if (!list_empty(&readyqueue)) {
 		// En este punto tenemos el proceso actual (current) que hay que quitarlo de la CPU y 
 		// volver a ponerlo en la cola de ready's
-		
-	
 		//Lo ponemos en la cola de ready's
-//		if (current()->PID != -1) update_process_state_rr(current(), &readyqueue);
 		
 		/** Nuevo proceso que entrará en ejecución **/
 
-		//Cogemos el primer proceso de la cola de ready's
 		struct list_head* lh = list_first(&readyqueue);
-		//Obtenemos su task_struct (PCB)
 		struct task_struct* new = list_head_to_task_struct(lh);
-		
 		list_del(lh); //Extract the process from the queue
 	
 		//Actualización de ESTADISTICAS del nuevo proceso (estadisticas READY -> RUN_system)
@@ -244,17 +229,14 @@ void sched_next_rr () {
 		new->stats.elapsed_total_ticks = get_ticks();
 		new->stats.remaining_ticks = get_quantum(&new);
 		new->stats.total_trans++;
+		current()->stats.total_trans++;
 		
 		//Cambio de estado del nuevo proceso a ST_RUN
-	//	update_process_state_rr(new, NULL);
-		new->state = ST_RUN;
-		//Actualización de tiempos
-//		new->quantum = QUANTUM;	// El nuevo proceso entra a CPU con quantum nuevo
-//		ticks_rr = get_quantum(&new);
+		update_process_state_rr(new, NULL);
+		//Actualización de tiempos TODO ????
 				
 		//Ponemos el nuevo proceso a ejecutar			
 		task_switch((union task_union*) new);	
-		set_quantum(current(),QUANTUM);
 	}
 	
 	else task_switch((union task_union*) idle_task);

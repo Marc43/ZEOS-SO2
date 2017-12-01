@@ -58,8 +58,6 @@ int sys_fork(){
 	//Estadisticas RUN_user a RUN_system
 	current()->stats.user_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
 	current()->stats.elapsed_total_ticks = get_ticks();
-
-  	int PID=-1;
   	
 	union task_union* child_union; 	//PCB del proceso hijo
 	union task_union* parent_union;	//PCB del proceso padre
@@ -165,10 +163,11 @@ int sys_fork(){
 	//We could also take the ebp of the parent
 	//And just: ebp >> 4 (number of elements in the stack)
 	//stack [1023 - (ebp >> 4)]
-	child_union->task.kernel_esp = &(child_union->stack [1023-18]);	
-	child_union->stack[1023-17] = (unsigned long *)&ret_from_fork;
+	child_union->task.kernel_esp = &(child_union->stack [KERNEL_STACK_SIZE-18]);	
+	child_union->stack[KERNEL_STACK_SIZE-17] = (unsigned long *)&ret_from_fork;
 	
 	// Init estadisticas
+	child_union->task.state = ST_READY;
 	child_union->task.stats.user_ticks = 0;
 	child_union->task.stats.system_ticks = 0;
 	child_union->task.stats.blocked_ticks = 0;
@@ -177,23 +176,20 @@ int sys_fork(){
 	child_union->task.stats.remaining_ticks = 0;
 	child_union->task.stats.elapsed_total_ticks = get_ticks();
 	
-	//Ponemos el proceso hijo en estado READY
-	child_union->task.state = ST_READY;
-	//y lo ponemos en la cola de ready's
 	list_add_tail(&(child_union->task.list), &readyqueue);
 	
 	//Estadisticas RUN_system a RUN_user
 	current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
 	current()->stats.elapsed_total_ticks = get_ticks();
 
-	return last_PID; //Se devuelve el siquiente PID que se puede usar
+	return child_union->task.PID; //Se devuelve el siquiente PID que se puede usar
 }
 
 void sys_exit() {
 	//Estadisticas RUN_user a RUN_system
 	current()->stats.user_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
 	current()->stats.elapsed_total_ticks = get_ticks();
-/*
+
 	struct task_struct* in_cpu = current();
 
 	page_table_entry* PT = get_PT(in_cpu);
@@ -207,12 +203,10 @@ void sys_exit() {
 		del_ss_pag(PT, i);
 		++i;	
 	}
-*/
-	free_user_pages(current());
+
 	current()->PID = -1; //To ensure our 'search' algorithm does not match at any cost
 	current()->state = 0;
 	update_process_state_rr(current(), &freequeue);
-	--last_PID;
 	
 	sched_next_rr();
 	
