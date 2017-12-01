@@ -289,7 +289,9 @@ struct task_struct *getPCBfromPID (int pid, struct list_head *queue){
 void init_semaphores() {
 	int i;
 	for (i = 0; i < NUM_SEMAPHORES; ++i) {
-		sem_vector [i].num_processes = -1;
+		sem_vector [i].owner_pid = -1;
+		sem_vector [i].num_blocked = 0;
+		sem_vector [i].max_blocked = 0;
 		INIT_LIST_HEAD(&(sem_vector[i].blocked_processes));	
 	}
 

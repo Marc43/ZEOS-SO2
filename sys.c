@@ -207,8 +207,9 @@ int sys_sem_init (int n_sem, int value) {
 	//Creates a new semaphore with num: num_sem && blocked queue size: value
 	if (n_sem >= 20) return -EINVAL;
 
-	if (sem_vector [n_sem].num_processes == -1) {
-		sem_vector [n_sem].num_processes = value;
+	if (sem_vector [n_sem].owner_pid == -1) {
+		sem_vector [n_sem].max_blocked = value;
+		sem_vector [n_sem].num_blocked = 0;
 		//We do nothing with the blocked queue by the moment...
 	}
 	else { 
@@ -223,15 +224,14 @@ int sys_sem_init (int n_sem, int value) {
 int sys_sem_wait (int n_sem) {
 	if (n_sem >= 20) return -EINVAL;
 
-	if (sem_vector [n_sem].num_processes == -1) return -EINVAL;
+	if (sem_vector [n_sem].owner_pid == -1) return -EINVAL;
 
-	struct task_struct* caller = current();
-	if (sem_vector [n_sem].num_processes <= 0) {
+	if (sem_vector [n_sem].num_blocked <= 0) {
 		//Whops, someone must be blocked
-		update_process_state_rr(caller, (&(sem_vector [n_sem].blocked_processes)));
+		update_process_state_rr(current(), (&(sem_vector [n_sem].blocked_processes)));
 	}
 	else
-		sem_vector [n_sem].num_processes--;
+		sem_vector [n_sem].num_blocked--;
 		
 	return 0;
 }
@@ -239,20 +239,33 @@ int sys_sem_wait (int n_sem) {
 int sys_sem_signal (int n_sem) {
 	if (n_sem >= 20) return -EINVAL;
 
-	if (sem_vector [n_sem] == -1) return -EINVAL;
+	if (sem_vector [n_sem].owner_pid == -1) return -EINVAL;
 
-	if (sem_vector [n_sem].num_processes == 0)
-		sem_vector [n_sem].num_processes++;
+	if (sem_vector [n_sem].num_blocked == 0)
+		sem_vector [n_sem].num_blocked++;
 	else {
-		sem_vector [n_sem].num_processes--;
-		
+		sem_vector [n_sem].num_blocked--;
+		struct list_head* lh = list_first(&(sem_vector [n_sem].blocked_processes));
+		struct task_struct* first = list_head_to_task_struct(lh);
+		update_process_state_rr(first, &readyqueue); //Unblock		
 	}
-
-
 
 	return 0;
 }
 
-int sys_sem_destroy () {
+int sys_sem_destroy (int n_sem) {
+	if (n_sem >= 20) return -EINVAL;
+
+	if (sem_vector [n_sem].owner_pid == -1) return -EINVAL;
+
+	if (sem_vector [n_sem].owner_pid == current()->PID) {
+		sem_vector [n_sem].owner_pid   = -1;
+		sem_vector [n_sem].max_blocked = 0;
+		INIT_LIST_HEAD(&(sem_vector [n_sem].blocked_processes));
+		//TODO Check this out..	
+	}
+	else 
+		return -EINVAL;
+
 	return 0;
 }

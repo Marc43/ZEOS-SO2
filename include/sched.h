@@ -14,7 +14,9 @@
 #define NUM_SEMAPHORES 20
 
 struct semaphore {
-	int num_processes;
+	int owner_pid;
+	unsigned int num_blocked;
+	unsigned int max_blocked;
 	struct list_head blocked_processes;
 };
 
