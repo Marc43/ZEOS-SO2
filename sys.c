@@ -91,20 +91,15 @@ int sys_fork(){
 	
 	while (frame >= 0 && i < NUM_PAG_DATA) {
 		frame = alloc_frame();	
-		//ph_pages [i] = frame;
-		//i++;		
 	
 		if (frame < 0) {
-			// En este punto es que no tenemos más frames libres
-			// Por tanto hay que liberar los frames obtenidos hasta ahora
-			// <--- No todos los frames, no los de Kernel... -->
-
 			free_user_pages(&(child_union->task)); //<-- ¿ Qué hace esto aquí ? !!!	
 	
 			int size_phpages = i; 
 			for (i = 0; i < size_phpages; i++) free_frame(ph_pages [i]);		
 
 			list_add_tail (&(child_union->task.list), &freequeue); //Free frames and restore pcb            
+			
 			//Estadisticas RUN_system a RUN_user
 			current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
 			current()->stats.elapsed_total_ticks = get_ticks();
@@ -179,7 +174,6 @@ int sys_fork(){
 	current()->stats.elapsed_total_ticks = get_ticks();
 
 	return child_union->task.PID; //Se devuelve el siquiente PID que se puede usar
-
 }
 
 void sys_exit() {
@@ -195,27 +189,24 @@ void sys_exit() {
 		in_cpu->info_dir_->valid = 0;
 		
 		int i;
-		for (i = NUM_PAG_KERNEL+NUM_PAG_CODE; i < NUM_PAG_KERNEL+NUM_PAG_CODE+NUM_PAG_DATA; ++i) {
+		for (i = NUM_PAG_KERNEL+NUM_PAG_CODE; i < NUM_PAG_KERNEL+NUM_PAG_CODE+NUM_PAG_DATA; ++i) {	
 			free_frame (get_frame(PT, i));	
 			del_ss_pag(PT, i);
-	
-		}	
+		} 
 	}
 
-	list_del(&(in_cpu->list));
+	list_add_tail(&(current()->list), &freequeue);	
 
 	current()->PID = -1; //To ensure our 'search' algorithm does not match at any cost
 
-	list_add_tail(&(current()->list), &freequeue);	
-	
 	sched_next_rr();
-	
+
+	return ;	
 }
 
 int sys_clone (void (*function)(void), void* stack) {
 
 	if (!(access_ok(VERIFY_WRITE, stack, 4) && access_ok(VERIFY_READ, function, 4))) 	return -EFAULT;
-
 
 	if (!list_empty(&freequeue)) {	
 
@@ -325,8 +316,7 @@ int sys_get_stats (int pid, struct stats *st){
 	current()->stats.elapsed_total_ticks = get_ticks();
 
 	int i;
-
-	//Comprobaciones
+	
 	if (pid < 0 ){
 		//Estadisticas RUN_system a RUN_user
 		current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;

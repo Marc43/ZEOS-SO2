@@ -192,7 +192,7 @@ int sem_init (int n_sem, unsigned int value) {
 
 	if (ret < 0) {
 		errno = ret;
-		ret = 0;
+		ret = -1;
 	}
 
 	return ret;
@@ -209,7 +209,7 @@ int sem_wait (int n_sem) {
 
 	if (ret < 0) {
 		errno = ret;
-		ret = 0;
+		ret = -1;
 	}
 
 	return ret;
@@ -226,7 +226,7 @@ int sem_signal (int n_sem) {
 
 	if (ret < 0) {
 		errno = ret;
-		ret = 0;
+		ret = -1;
 	}
 
 	return ret;
@@ -243,7 +243,7 @@ int sem_destroy (int n_sem) {
 
 	if (ret < 0) {
 		errno = ret;
-		ret = 0;
+		ret = -1;
 	}
 
 	return ret;
