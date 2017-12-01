@@ -30,25 +30,50 @@ int check_fd(int fd, int permissions)
   return 0;
 }
 
-int sys_ni_syscall()
-{
+int sys_ni_syscall(){
+	//Estadisticas RUN_user a RUN_system
+	current()->stats.user_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+	current()->stats.elapsed_total_ticks = get_ticks();
+	
+	//Estadisticas RUN_system a RUN_user
+	current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+	current()->stats.elapsed_total_ticks = get_ticks();
+	
 	return -38; /*ENOSYS*/
 }
 
-int sys_getpid()
-{
+int sys_getpid(){
+	//Estadisticas RUN_user a RUN_system
+	current()->stats.user_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+	current()->stats.elapsed_total_ticks = get_ticks();
+	
+	//Estadisticas RUN_system a RUN_user
+	current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+	current()->stats.elapsed_total_ticks = get_ticks();
+
 	return current()->PID;
 }
 
-int sys_fork()
-{
+int sys_fork(){
+	//Estadisticas RUN_user a RUN_system
+	current()->stats.user_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+	current()->stats.elapsed_total_ticks = get_ticks();
+  	
+	union task_union* child_union; 	//PCB del proceso hijo
+	union task_union* parent_union;	//PCB del proceso padre
 
-  	int PID=-1;
-  	// creates the child process
-  	union task_union* child_union;
-	union task_union* parent_union;
+	// Comprobacion de si hay task_struct (PCB) libres en la cola de freequeue
+	if (list_empty(&freequeue)) {	
+		//printk("Insert an error code, that means there are no more pcb's");
+	
+		//Estadisticas RUN_system a RUN_user
+		current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+		current()->stats.elapsed_total_ticks = get_ticks();
 
-	if (!list_empty(&freequeue)) {
+		return -EAGAIN;  // Antes -ECHILD	
+	}
+	// Hay un PCB libre y podemos usarlo para el proceso hijo 
+  	else {	
 		struct list_head* lh = list_first (&freequeue);
 		list_del(lh);
 
@@ -57,41 +82,41 @@ int sys_fork()
 
 		struct task_struct* parent = current();
 		parent_union = (union task_union*)parent;
-
-		//The size of the union is the max(task_struct, stack)	
-		copy_data(parent_union, child_union, sizeof(union task_union));
-
-		allocate_DIR(&(child_union->task)); //Does not contemplate any error...
-	} 
-  	else {
-		printk("Insert an error code, that means there are no more pcb's");
-	
-		return -ECHILD;	
+		
 	}
 
-	//Search for physical pages
-	int i = 0;
-	int frame = alloc_frame();	
+	//Busqueda de páginas físicas de memoria (frames)
+	int i = 0; int frame=0;
 	unsigned int ph_pages [NUM_PAG_DATA];
 	
 	while (frame >= 0 && i < NUM_PAG_DATA) {
-		ph_pages [i] = frame;
-		frame = alloc_frame();
-		i++;		
-	}
+		frame = alloc_frame();	
+		//ph_pages [i] = frame;
+		//i++;		
 	
-	if (frame < 0) {
-		printk("Insert an error code, no more physical pages available");
-	
-		int i = 0;
-        while (i < NUM_PAG_DATA && ph_pages [i] > 0)                  
-			free_frame(ph_pages [i]);
+		if (frame < 0) {
+			// En este punto es que no tenemos más frames libres
+			// Por tanto hay que liberar los frames obtenidos hasta ahora
+			// <--- No todos los frames, no los de Kernel... -->
 
-		list_add_tail (&(child_union->task.list), &freequeue); //Free frames and restore pcb            
-        //Is the allocated DIR someway attached to the PCB????
-		
-		return -ENOMEM;
+			free_user_pages(&(child_union->task)); //<-- ¿ Qué hace esto aquí ? !!!	
+	
+			int size_phpages = i; 
+			for (i = 0; i < size_phpages; i++) free_frame(ph_pages [i]);		
+
+			list_add_tail (&(child_union->task.list), &freequeue); //Free frames and restore pcb            
+			//Estadisticas RUN_system a RUN_user
+			current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+			current()->stats.elapsed_total_ticks = get_ticks();
+
+			return -ENOMEM;
+		}
+		ph_pages[i] = frame;
+		i++;
 	}
+	
+	copy_data(parent_union, child_union, sizeof(union task_union));
+	allocate_DIR(&(child_union->task));
 
 	i = 0;
 	page_table_entry* PT_child = get_PT(&(child_union->task));
@@ -103,7 +128,7 @@ int sys_fork()
 		//from 0 to 255 because we know that addresses (kernel ph_pages)
 		i++;
 	}
-	
+
 	i = NUM_PAG_KERNEL;	
 	while (i < NUM_PAG_KERNEL + NUM_PAG_CODE) {
 		unsigned int code_frame_number = get_frame(PT_parent, i);
@@ -128,39 +153,63 @@ int sys_fork()
 		}
 	
 	child_union->task.PID = last_PID++; 
-
+	child_union->task.quantum = get_quantum(&parent_union->task);
 	set_cr3(parent_union->task.dir_pages_baseAddr);	
 	
 	//We could also take the ebp of the parent
 	//And just: ebp >> 4 (number of elements in the stack)
 	//stack [1023 - (ebp >> 4)]
-	child_union->task.kernel_esp = &(child_union->stack [KERNEL_STACK_SIZE-19]);	
-	child_union->stack[KERNEL_STACK_SIZE-18] = (unsigned long *)&ret_from_fork;
-
+	child_union->task.kernel_esp = &(child_union->stack [KERNEL_STACK_SIZE-18]);	
+	child_union->stack[KERNEL_STACK_SIZE-17] = (unsigned long *)&ret_from_fork;
+	
+	// Init estadisticas
+	child_union->task.state = ST_READY;
+	child_union->task.stats.user_ticks = 0;
+	child_union->task.stats.system_ticks = 0;
+	child_union->task.stats.blocked_ticks = 0;
+	child_union->task.stats.ready_ticks = 0;
+	child_union->task.stats.total_trans = 0;
+	child_union->task.stats.remaining_ticks = 0;
+	child_union->task.stats.elapsed_total_ticks = get_ticks();
+	
 	list_add_tail(&(child_union->task.list), &readyqueue);
+	
+	//Estadisticas RUN_system a RUN_user
+	current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+	current()->stats.elapsed_total_ticks = get_ticks();
 
-	return last_PID-1;
+	return child_union->task.PID; //Se devuelve el siquiente PID que se puede usar
+
 }
 
 void sys_exit() {
-	struct task_struct* in_cpu = current();
-	//We have to free the frames, and 're'-queue the PCB
-	page_table_entry* PT = get_PT(in_cpu);
+	//Estadisticas RUN_user a RUN_system
+	current()->stats.user_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+	current()->stats.elapsed_total_ticks = get_ticks();
 
+	struct task_struct* in_cpu = current();
+	page_table_entry* PT = get_PT(in_cpu);
+	
 	in_cpu->info_dir_->num_of--;
 	if (in_cpu->info_dir_->num_of <= 0) {
 		in_cpu->info_dir_->valid = 0;
 		
 		int i;
-		for (i = NUM_PAG_KERNEL+NUM_PAG_CODE; i < NUM_PAG_KERNEL+NUM_PAG_CODE+NUM_PAG_DATA; ++i) 
-		free_frame (get_frame(PT, i));	
-		
+		for (i = NUM_PAG_KERNEL+NUM_PAG_CODE; i < NUM_PAG_KERNEL+NUM_PAG_CODE+NUM_PAG_DATA; ++i) {
+			free_frame (get_frame(PT, i));	
+			del_ss_pag(PT, i);
+	
+		}	
 	}
 
-	//Alliberar PCB (encuar cua FREES);	
 	list_del(&(in_cpu->list));
+
+	current()->PID = -1; //To ensure our 'search' algorithm does not match at any cost
+
+	list_add_tail(&(current()->list), &freequeue);	
 	
 	sched_next_rr();
+	
 }
 
 int sys_clone (void (*function)(void), void* stack) {
@@ -203,47 +252,125 @@ int sys_clone (void (*function)(void), void* stack) {
 }
 
 int sys_write (int fd, char* buffer, int size) {
+	//Estadisticas RUN_user a RUN_system
+	current()->stats.user_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+	current()->stats.elapsed_total_ticks = get_ticks();
+
 	char mkernel_buff[4];
-    int bytesWritten = 0;
-	int error = check_fd (fd, 1);
+	int bytesWritten = 0;
+	int error = check_fd (fd, ESCRIPTURA);
 	
-	if (error != 0) return error;
-	if (buffer == NULL) return -EINVAL;
-	if (size <= 0) return -EINVAL;
-	if (access_ok(VERIFY_READ, buffer, size) == 0) return -EACCES;
-	
-    // traspaso de bloques de 4 en 4 bytes
-    for (;size > 4; buffer +=  4, size -= 4){
+	if (error != 0){
+		//Estadisticas RUN_system a RUN_user
+		current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+		current()->stats.elapsed_total_ticks = get_ticks();
+
+		return -EBADF;
+	}
+	if (buffer == NULL){
+       		//Estadisticas RUN_system a RUN_user
+		current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+		current()->stats.elapsed_total_ticks = get_ticks();
+
+        	return -EFAULT;
+	}
+	if (size < 0){
+		//Estadisticas RUN_system a RUN_user
+		current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+		current()->stats.elapsed_total_ticks = get_ticks();
+
+		return -EINVAL;
+	}
+	if (access_ok(VERIFY_READ, buffer, size) == 0){
+		//Estadisticas RUN_system a RUN_user
+		current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+		current()->stats.elapsed_total_ticks = get_ticks();
+
+		return -EACCES;
+	}
+    	// traspaso de bloques de 4 en 4 bytes
+    	for (;size > 4; buffer +=  4, size -= 4){
 		copy_from_user(buffer, mkernel_buff, 4);
 		bytesWritten += sys_write_console(mkernel_buff,4);
 	}
             
-    // traspaso del resto del buffer
-    if (size != 0){
+    	// traspaso del resto del buffer
+    	if (size != 0){
 	    copy_from_user(buffer, mkernel_buff, size);
 	    bytesWritten += sys_write_console(mkernel_buff,size);
-    }
- 
-    return bytesWritten;    // Devuelve el num. de bytes escritos
+    	}	
+	
+	//Estadisticas RUN_system a RUN_user
+	current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+	current()->stats.elapsed_total_ticks = get_ticks();
+
+    	return bytesWritten;    // Devuelve el num. de bytes escritos
 }
 
-int sys_gettime () {
+int sys_gettime () {	
+	//Estadisticas RUN_user a RUN_system
+	current()->stats.user_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+	current()->stats.elapsed_total_ticks = get_ticks();
 	
+	//Estadisticas RUN_system a RUN_user
+	current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+	current()->stats.elapsed_total_ticks = get_ticks();
+
 	return zeos_ticks;
 }
 
 int sys_get_stats (int pid, struct stats *st){
-	struct task_struct *ts;
-	
-	//Comprobaciones
-	if (access_ok(VERIFY_WRITE,st,56) == 0) return -EACCES;
-	
-	//Busqueda del PCB
-	ts = getPCBfromPID (pid, &readyqueue);
-	if (ts != NULL ) copy_to_user(&ts->stats, st, 56);
+	//Estadisticas RUN_user a RUN_system
+	current()->stats.user_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+	current()->stats.elapsed_total_ticks = get_ticks();
 
-	else return -ESRCH;
-	return 0;
+	int i;
+
+	//Comprobaciones
+	if (pid < 0 ){
+		//Estadisticas RUN_system a RUN_user
+		current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+		current()->stats.elapsed_total_ticks = get_ticks();
+
+ 		return -EINVAL;
+	}
+	
+	if (access_ok(VERIFY_WRITE,st,sizeof(struct stats_s)) == 0){
+		//Estadisticas RUN_system a RUN_user
+		current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+		current()->stats.elapsed_total_ticks = get_ticks();
+
+		return -EFAULT;
+	}
+
+	//Busqueda del PCB
+	if (current()->PID == pid){
+		copy_to_user(&(current()->stats), st, sizeof(struct stats_s));
+		
+		//Estadisticas RUN_system a RUN_user
+		current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+		current()->stats.elapsed_total_ticks = get_ticks();
+
+		return 0;
+	}
+
+	for (i = 0; i < NR_TASKS; ++i){
+		if (task[i].task.PID == pid && task[i].task.state == ST_READY){
+			copy_to_user(&(task[i].task.stats), st, sizeof(struct stats_s));
+
+			//Estadisticas RUN_system a RUN_user
+			current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+			current()->stats.elapsed_total_ticks = get_ticks();
+
+			return 0;
+		}
+	}
+	//Estadisticas RUN_system a RUN_user
+	current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+	current()->stats.elapsed_total_ticks = get_ticks();
+
+	return -ESRCH;
+	
 }
 
 int sys_sem_init (int n_sem, int value) {

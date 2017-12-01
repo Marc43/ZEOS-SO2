@@ -84,19 +84,18 @@ ENTRY (keyboard_handler)
 
 ENTRY (system_call_handler)
 	SAVE_ALL 
-	cmpl $0, %eax //eax < 0 ?
-	jl err
-	cmpl $MAX_SYSCALL, %eax //eax > 0 ?
-	jg err
-	call *sys_call_table (, %eax, 0x04)
-	jmp fin
+	cmpl $0, %eax; //eax < 0 ?
+	jl err;
+	cmpl $MAX_SYSCALL, %eax; //eax > 0 ?
+	jg err;
+	call *sys_call_table (, %eax, 0x04);
+	jmp fin;
 err:
-	movl $-ENOSYS, %eax
-	
+	movl $-ENOSYS, %eax;	
 fin:
-	movl %eax, 0x18(%esp) //Modify the value in the Stack-eax so when we restore the context actually we changed a little bit the context
+	movl %eax, 0x18(%esp); //Modify the value in the Stack-eax so when we restore the context actually we changed a little bit the context
 	RESTORE_ALL
-	iret //Return from kernel privilege level...
+	iret; //Return from kernel privilege level...
 
 ENTRY (ret_from_fork)
 	RESTORE_ALL

@@ -11,6 +11,7 @@
 
 #define NR_TASKS      10
 #define KERNEL_STACK_SIZE	1024
+#define QUANTUM	10
 #define NUM_SEMAPHORES 20
 
 struct semaphore {

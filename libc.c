@@ -27,7 +27,6 @@ void perror() {
 	write (1, msg, strlen(msg));
 }
 
-
 void itoa(int a, char *b)
 {
   int i, i1;
@@ -69,10 +68,10 @@ int write (int fd, char* buffer, int size) {
 	__asm__ __volatile__ ("movl $0x04, %%eax;"
                           "int $0x80;"
                           "movl %%eax, %0;"
-                          : "=m" (rt) 
+                          : "=a" (rt) 
 						  : "b" (fd), "c" (buffer), "d" (size));
 	
-	if (-rt > 0) {errno = rt; return -1;}	
+	if (-rt > 0) {errno = -rt; return -1;}	
 	
 	return rt;
 
@@ -88,7 +87,8 @@ int gettime () {
 						  : "eax");
 
 	if (-ret > 0) {
-		errno = ret;
+		errno = -ret;
+		
 		return -1;
 	}	
 	
@@ -105,7 +105,8 @@ int getpid () {
 						  : "eax");
 	
 	if (-ret > 0) {
-		errno = ret;
+		errno = -ret;
+
 		return -1;
 	}
 
@@ -122,7 +123,8 @@ int fork () {
 						  : "eax");
 
 	if (-ret > 0) {
-		errno = ret;
+		errno = -ret;
+		
 		return -1;
 	}	
 
@@ -134,14 +136,15 @@ void exit () {
 	__asm__ __volatile__ ("movl $1, %%eax;"
 						  "int $0x80;"
 						  "movl %%eax, %0;"
-						  : "=m" (ret)
+						  :"=m" (ret) 
 						  : 
 						  : "eax");
 
 	if (-ret > 0) {
-		errno = ret;
+		errno = -ret;
 	}
-
+		
+	return ;
 }
 
 int clone (void (*function) (void), void *stack) {
@@ -154,7 +157,7 @@ int clone (void (*function) (void), void *stack) {
 						  : "eax");
 	
 	if (-ret > 0) {
-		errno = ret;
+		errno = -ret;
 		 
 		return -1;
 	}
@@ -162,16 +165,16 @@ int clone (void (*function) (void), void *stack) {
 	return ret;
 }
  
-int get_stats (int pid, struct stats *st) {
-	unsigned long int ret = 0;				// Identificador de llamada a sistema: 35
+int get_stats (int pid, struct stats *st){
+	int ret = 0;				// Identificador de llamada a sistema: 35
 	__asm__ __volatile__ ("movl 	$35, %%eax;"
 			      "int 	$0x80;"
 			      "movl 	%%eax, %0;"
-			      : "=m" (ret), "+b" (pid), "+c" (st)
-			      :
-			      : "eax" );
+			      : "=m" (ret)
+			      : "b" (pid), "c" (st)
+			      : "eax");
 	if (ret < 0){
-		errno = ret;
+		errno = -ret;
 		ret = -1;
 	}
 
@@ -189,7 +192,7 @@ int sem_init (int n_sem, unsigned int value) {
 
 	if (ret < 0) {
 		errno = ret;
-		ret = -1;
+		ret = 0;
 	}
 
 	return ret;
@@ -206,7 +209,7 @@ int sem_wait (int n_sem) {
 
 	if (ret < 0) {
 		errno = ret;
-		ret = -1;
+		ret = 0;
 	}
 
 	return ret;
@@ -223,7 +226,7 @@ int sem_signal (int n_sem) {
 
 	if (ret < 0) {
 		errno = ret;
-		ret = -1;
+		ret = 0;
 	}
 
 	return ret;
@@ -240,7 +243,7 @@ int sem_destroy (int n_sem) {
 
 	if (ret < 0) {
 		errno = ret;
-		ret = -1;
+		ret = 0;
 	}
 
 	return ret;

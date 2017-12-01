@@ -1,4 +1,5 @@
 #include <libc.h>
+#include <errno.h>
 
 int pid;
 
