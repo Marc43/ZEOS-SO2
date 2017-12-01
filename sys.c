@@ -159,7 +159,7 @@ int sys_fork(){
 		}
 	
 	child_union->task.PID = last_PID++; 
-
+	child_union->task.quantum = get_quantum(&parent_union->task);
 	set_cr3(parent_union->task.dir_pages_baseAddr);	
 	
 	//We could also take the ebp of the parent
@@ -174,7 +174,7 @@ int sys_fork(){
 	child_union->task.stats.blocked_ticks = 0;
 	child_union->task.stats.ready_ticks = 0;
 	child_union->task.stats.total_trans = 0;
-	child_union->task.stats.remaining_ticks = QUANTUM;
+	child_union->task.stats.remaining_ticks = 0;
 	child_union->task.stats.elapsed_total_ticks = get_ticks();
 	
 	//Ponemos el proceso hijo en estado READY
@@ -193,7 +193,7 @@ void sys_exit() {
 	//Estadisticas RUN_user a RUN_system
 	current()->stats.user_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
 	current()->stats.elapsed_total_ticks = get_ticks();
-
+/*
 	struct task_struct* in_cpu = current();
 
 	page_table_entry* PT = get_PT(in_cpu);
@@ -207,18 +207,15 @@ void sys_exit() {
 		del_ss_pag(PT, i);
 		++i;	
 	}
-
-	in_cpu->PID = -1; //To ensure our 'search' algorithm does not match at any cost
-	in_cpu->state = 0;
-	list_add_tail(&(in_cpu->list), &freequeue);
+*/
+	free_user_pages(current());
+	current()->PID = -1; //To ensure our 'search' algorithm does not match at any cost
+	current()->state = 0;
+	update_process_state_rr(current(), &freequeue);
 	--last_PID;
 	
 	sched_next_rr();
 	
-	//Estadisticas RUN_system a RUN_user
-	current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
-	current()->stats.elapsed_total_ticks = get_ticks();
-
 }
 
 int sys_write (int fd, char* buffer, int size) {
@@ -294,7 +291,6 @@ int sys_get_stats (int pid, struct stats *st){
 	current()->stats.user_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
 	current()->stats.elapsed_total_ticks = get_ticks();
 
-	struct task_struct *ts;
 	int i;
 
 	//Comprobaciones
@@ -311,14 +307,23 @@ int sys_get_stats (int pid, struct stats *st){
 		current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
 		current()->stats.elapsed_total_ticks = get_ticks();
 
-		return -EACCES;
+		return -EFAULT;
 	}
 
 	//Busqueda del PCB
+	if (current()->PID == pid){
+		copy_to_user(&(current()->stats), st, sizeof(struct stats_s));
+		
+		//Estadisticas RUN_system a RUN_user
+		current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+		current()->stats.elapsed_total_ticks = get_ticks();
+
+		return 0;
+	}
 
 	for (i = 0; i < NR_TASKS; ++i){
 		if (task[i].task.PID == pid && task[i].task.state == ST_READY){
-			copy_to_user(&(ts->stats), st, sizeof(struct stats_s));
+			copy_to_user(&(task[i].task.stats), st, sizeof(struct stats_s));
 
 			//Estadisticas RUN_system a RUN_user
 			current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;

@@ -88,7 +88,7 @@ void init_idle (void) {
 	 	idle->stats.blocked_ticks = 0;
 		idle->stats.ready_ticks = 0;
 		idle->stats.total_trans = 0;
-		idle->stats.remaining_ticks = QUANTUM;
+		idle->stats.remaining_ticks = 0;
 		idle->stats.elapsed_total_ticks = get_ticks();
 	}
 	//else (Doesn't make sense, there will be free PCB's always...)
@@ -110,7 +110,7 @@ void init_task1(void) {
 	
 		task1->kernel_esp = tss.esp0; //At the start, they point to the same memory position 
 		
-		task1->quantum = QUANTUM;
+		set_quantum(&task1,QUANTUM);
 		
 		//Estadisticas del proceso task1
 		task1->stats.user_ticks = 0;
@@ -206,10 +206,19 @@ void update_process_state_rr (struct task_struct *t, struct list_head *dst_queue
 		//Means that t must RUN
 		t->state = ST_RUN;
 	}
-	else {
+	else if (dst_queue == &freequeue){
+		t->state = 0;
+		list_add_tail(lh, dst_queue);	
+	}
+	else if (dst_queue == &readyqueue){
+		//Actualizacion de ESTADISTICAS del proceso actual (estadisticas RUN_system -> READY)
+		current()->stats.system_ticks += get_ticks()-current()->stats.elapsed_total_ticks;
+		current()->stats.elapsed_total_ticks = get_ticks();
+		
 		t->state = ST_READY;
 		list_add_tail(lh, dst_queue); //By the moment only ready
 	}
+	
 }
 
 void sched_next_rr () {
@@ -217,12 +226,9 @@ void sched_next_rr () {
 		// En este punto tenemos el proceso actual (current) que hay que quitarlo de la CPU y 
 		// volver a ponerlo en la cola de ready's
 		
-		//Actualizacion de ESTADISTICAS del proceso actual (estadisticas RUN_system -> READY)
-		current()->stats.system_ticks += get_ticks()-current()->stats.elapsed_total_ticks;
-		current()->stats.elapsed_total_ticks = get_ticks();
-		
+	
 		//Lo ponemos en la cola de ready's
-		update_process_state_rr(current(), &readyqueue);
+//		if (current()->PID != -1) update_process_state_rr(current(), &readyqueue);
 		
 		/** Nuevo proceso que entrará en ejecución **/
 
@@ -236,17 +242,19 @@ void sched_next_rr () {
 		//Actualización de ESTADISTICAS del nuevo proceso (estadisticas READY -> RUN_system)
 		new->stats.ready_ticks += get_ticks()-new->stats.elapsed_total_ticks;
 		new->stats.elapsed_total_ticks = get_ticks();
-		new->stats.remaining_ticks = QUANTUM;
+		new->stats.remaining_ticks = get_quantum(&new);
 		new->stats.total_trans++;
 		
 		//Cambio de estado del nuevo proceso a ST_RUN
-		update_process_state_rr(new, NULL);
-
+	//	update_process_state_rr(new, NULL);
+		new->state = ST_RUN;
 		//Actualización de tiempos
-		new->quantum = QUANTUM;	// El nuevo proceso entra a CPU con quantum nuevo
-		
+//		new->quantum = QUANTUM;	// El nuevo proceso entra a CPU con quantum nuevo
+//		ticks_rr = get_quantum(&new);
+				
 		//Ponemos el nuevo proceso a ejecutar			
 		task_switch((union task_union*) new);	
+		set_quantum(current(),QUANTUM);
 	}
 	
 	else task_switch((union task_union*) idle_task);
