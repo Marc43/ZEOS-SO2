@@ -195,6 +195,13 @@ void sys_exit() {
 		} 
 	}
 
+	int i;
+	for (i = 0; i < NUM_SEMAPHORES; i++) {
+		if (sem_vector [i].owner_pid == in_cpu->PID) {
+			sem_destroy(sem_vector [i].owner_pid);
+		}
+	}
+
 	list_add_tail(&(current()->list), &freequeue);	
 
 	current()->PID = -1; //To ensure our 'search' algorithm does not match at any cost

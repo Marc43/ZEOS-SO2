@@ -41,13 +41,13 @@ page_table_entry * get_PT (struct task_struct *t)
 	return (page_table_entry *)(((unsigned int)(t->dir_pages_baseAddr->bits.pbase_addr))<<12);
 }
 
-
 int allocate_DIR(struct task_struct *t) 
 {
-	int i = 0; int control;
-	while (control > 0 && i < NR_TASKS) { 
-		++i; //idle is not going to get dir, so, first inc
-		if (dir_ [i].valid == 0) control = -1;
+	//Search the first free DIR
+	int i = 0; int found = 0;
+	while (!found  && i < NR_TASKS) { 
+		if (dir_ [i].valid == 0) found = 1;	
+		++i;
 	}
 	if (i >= NR_TASKS) return -1; 
 
@@ -118,7 +118,7 @@ void init_task1(void) {
 	
 		task1->kernel_esp = tss.esp0; //At the start, they point to the same memory position 
 		
-		set_quantum(&task1, QUANTUM);
+		set_quantum(task1, QUANTUM);
 		
 		//Estadisticas del proceso task1
 		task1->stats.user_ticks = 0;
@@ -139,6 +139,7 @@ void init_sched(){
 	init_idle();
 	init_task1();
 	init_semaphores();
+	init_dir_structure();
 }
 
 struct task_struct* current()
@@ -180,8 +181,7 @@ void task_switch (union task_union* t) {
 
 void inner_task_switch (union task_union* t) {	
 	tss.esp0 = &(t->stack[KERNEL_STACK_SIZE]);
-	set_cr3 (t->task.dir_pages_baseAddr); //Set the new page directory (intel will erase TLB)
-	ticks_rr = t->task.quantum;  
+	if (!thread_of(current(), t)) set_cr3 (t->task.dir_pages_baseAddr);
 	__asm__ __volatile__ ( 	"movl %%ebp, %0;" 
 						    "movl %1, %%esp;"
 							"popl %%ebp;"
@@ -225,11 +225,6 @@ void update_process_state_rr (struct task_struct *t, struct list_head *dst_queue
 
 void sched_next_rr () {
 	if (!list_empty(&readyqueue)) {
-		// En este punto tenemos el proceso actual (current) que hay que quitarlo de la CPU y 
-		// volver a ponerlo en la cola de ready's
-		//Lo ponemos en la cola de ready's
-		
-		/** Nuevo proceso que entrará en ejecución **/
 
 		struct list_head* lh = list_first(&readyqueue);
 		struct task_struct* new = list_head_to_task_struct(lh);
@@ -238,14 +233,13 @@ void sched_next_rr () {
 		//Actualización de ESTADISTICAS del nuevo proceso (estadisticas READY -> RUN_system)
 		new->stats.ready_ticks += get_ticks()-new->stats.elapsed_total_ticks;
 		new->stats.elapsed_total_ticks = get_ticks();
-		new->stats.remaining_ticks = get_quantum(&new);
+		new->stats.remaining_ticks = get_quantum(new);
 		new->stats.total_trans++;
 		current()->stats.total_trans++;
 		
 		//Cambio de estado del nuevo proceso a ST_RUN
 		update_process_state_rr(new, NULL);
-		//Actualización de tiempos TODO ????
-				
+	
 		//Ponemos el nuevo proceso a ejecutar			
 		task_switch((union task_union*) new);	
 	}
@@ -262,10 +256,9 @@ void set_quantum (struct task_struct *t, int new_quantum) {
 }
 
 void schedule () {
-	//Actualiza ticks_rr (decrementa en 1)
 	update_sched_data_rr();
-	// Comprueba si hay que hacer un cambio de proceso
 	if (needs_sched_rr()) {
+		update_process_state_rr(current(), &readyqueue);
 		sched_next_rr();
 	}
 }
@@ -280,4 +273,24 @@ void init_semaphores() {
 	}
 
 	return ;
+}
+
+void init_dir_structure() {
+	int i;
+	for (i = 0; i < NR_TASKS; ++i) {
+		dir_ [i].valid = 0;
+		dir_ [i].num_of = 0;
+	}
+
+	return ;
+}
+
+int thread_of (struct task_struct *fth, struct task_struct *son) {
+	if (fth->dir_pages_baseAddr == son->dir_pages_baseAddr) {
+		return 1;
+	}
+	
+	return -1;
+
+	//This does not really check if is father -> son, just if they share the directory... :)
 }

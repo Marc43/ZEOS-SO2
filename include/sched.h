@@ -110,6 +110,8 @@ int get_quantum (struct task_struct *t); //How many CPU ticks a process can wast
 
 void set_quantum (struct task_struct *t, int new_quantum); //Set a new quantum for task t
 
+int thread_of (struct task_struct *fth, struct task_struct *son);
+
 /* Init free && ready queue */
 
 void init_free_queue();
@@ -117,4 +119,7 @@ void init_free_queue();
 void init_ready_queue();
 
 void init_semaphores();
+
+void init_dir_structure();
+
 #endif  /* __SCHED_H__ */
