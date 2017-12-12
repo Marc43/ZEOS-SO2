@@ -224,18 +224,27 @@ int sys_clone (void (*function)(void), void* stack) {
 		union task_union* 	thread = (union task_union*) task_thread;
 		union task_union*	current_tasku = (union task_union*) current();
 
-		copy_data(&(current_tasku->stack[0]), &(thread->stack[0]), sizeof(union task_union));
+		copy_data(current_tasku, thread, sizeof(union task_union));
 
 		thread->task.kernel_esp = &(thread->stack[KERNEL_STACK_SIZE-18]); 
 		thread->task.PID = last_PID++;
-		thread->task.state = ST_READY;
 		thread->task.info_dir_->num_of++; //Update the number of proccesses on that directory...		
 		
 		thread->stack[KERNEL_STACK_SIZE-2] = stack; 
 		thread->stack[KERNEL_STACK_SIZE-5] = function;
 		thread->stack[KERNEL_STACK_SIZE-18] = 0xaaaa;
 		thread->stack[KERNEL_STACK_SIZE-17] = &ret_from_fork;
-					
+		
+	
+		thread->task.state = ST_READY;
+		thread->task.stats.user_ticks = 0;
+		thread->task.stats.system_ticks = 0;
+		thread->task.stats.blocked_ticks = 0;
+		thread->task.stats.ready_ticks = 0;                   		
+		thread->task.stats.total_trans = 0;
+		thread->task.stats.remaining_ticks = 0;
+		thread->task.stats.elapsed_total_ticks = get_ticks(); 	
+			
 		list_add_tail(&(thread->task.list), &readyqueue);
 
 		return last_PID-1;
@@ -372,9 +381,10 @@ int sys_get_stats (int pid, struct stats *st){
 int sys_sem_init (int n_sem, int value) {
 	//ebx: num_sem, ecx: value
 	//Creates a new semaphore with num: num_sem && blocked queue size: value
-	if (n_sem >= 20) return -EINVAL;
+	if (n_sem >= NUM_SEMAPHORES || n_sem < 0 || value < 0) return -EINVAL;
 
 	if (sem_vector [n_sem].owner_pid == -1) {
+		sem_vector [n_sem].owner_pid = current()->PID;
 		sem_vector [n_sem].max_blocked = value;
 		sem_vector [n_sem].num_blocked = 0;
 		//We do nothing with the blocked queue by the moment...
@@ -389,7 +399,7 @@ int sys_sem_init (int n_sem, int value) {
 }
 
 int sys_sem_wait (int n_sem) {
-	if (n_sem >= 20) return -EINVAL;
+	if (n_sem >= NUM_SEMAPHORES || n_sem < 0) return -EINVAL;
 
 	if (sem_vector [n_sem].owner_pid == -1) return -EINVAL;
 
@@ -404,7 +414,7 @@ int sys_sem_wait (int n_sem) {
 }
 
 int sys_sem_signal (int n_sem) {
-	if (n_sem >= 20) return -EINVAL;
+	if (n_sem >= NUM_SEMAPHORES || n_sem < 0) return -EINVAL;
 
 	if (sem_vector [n_sem].owner_pid == -1) return -EINVAL;
 
@@ -421,7 +431,7 @@ int sys_sem_signal (int n_sem) {
 }
 
 int sys_sem_destroy (int n_sem) {
-	if (n_sem >= 20) return -EINVAL;
+	if (n_sem >= NUM_SEMAPHORES || n_sem < 0) return -EINVAL;
 
 	if (sem_vector [n_sem].owner_pid == -1) return -EINVAL;
 

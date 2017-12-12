@@ -181,7 +181,7 @@ void task_switch (union task_union* t) {
 
 void inner_task_switch (union task_union* t) {	
 	tss.esp0 = &(t->stack[KERNEL_STACK_SIZE]);
-	if (!thread_of(current(), t)) set_cr3 (t->task.dir_pages_baseAddr);
+	if (thread_of(current(), t) == -1) set_cr3 (t->task.dir_pages_baseAddr);
 	__asm__ __volatile__ ( 	"movl %%ebp, %0;" 
 						    "movl %1, %%esp;"
 							"popl %%ebp;"
