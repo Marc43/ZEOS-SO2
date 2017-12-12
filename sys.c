@@ -213,7 +213,7 @@ void sys_exit() {
 
 int sys_clone (void (*function)(void), void* stack) {
 
-	if (!(access_ok(VERIFY_WRITE, stack, 4) && access_ok(VERIFY_READ, function, 4))) 	return -EFAULT;
+	if (!(access_ok(VERIFY_WRITE, stack, 4) && access_ok(VERIFY_READ, function, 4))) return -EFAULT;
 
 	if (!list_empty(&freequeue)) {	
 
@@ -229,7 +229,8 @@ int sys_clone (void (*function)(void), void* stack) {
 		thread->task.kernel_esp = &(thread->stack[KERNEL_STACK_SIZE-18]); 
 		thread->task.PID = last_PID++;
 		thread->task.info_dir_->num_of++; //Update the number of proccesses on that directory...		
-		
+		thread->task.dir_pages_baseAddr = current_tasku->task.dir_pages_baseAddr; //Just in case...
+	
 		thread->stack[KERNEL_STACK_SIZE-2] = stack; 
 		thread->stack[KERNEL_STACK_SIZE-5] = function;
 		thread->stack[KERNEL_STACK_SIZE-18] = 0xaaaa;
@@ -383,7 +384,7 @@ int sys_sem_init (int n_sem, int value) {
 	//Creates a new semaphore with num: num_sem && blocked queue size: value
 	if (n_sem >= NUM_SEMAPHORES || n_sem < 0 || value < 0) return -EINVAL;
 
-	if (sem_vector [n_sem].owner_pid == -1) {
+	if (sem_vector [n_sem].owner_pid == -1) { //Checks if it is initialized and also free!
 		sem_vector [n_sem].owner_pid = current()->PID;
 		sem_vector [n_sem].max_blocked = value;
 		sem_vector [n_sem].num_blocked = 0;
@@ -405,9 +406,10 @@ int sys_sem_wait (int n_sem) {
 
 	if (sem_vector [n_sem].num_blocked <= 0) {
 		//Whops, someone must be blocked
+		sem_vector [n_sem].num_blocked++;
 		update_process_state_rr(current(), (&(sem_vector [n_sem].blocked_processes)));
 	}
-	else
+	else //Desbloquear?????
 		sem_vector [n_sem].num_blocked--;
 		
 	return 0;
@@ -418,7 +420,7 @@ int sys_sem_signal (int n_sem) {
 
 	if (sem_vector [n_sem].owner_pid == -1) return -EINVAL;
 
-	if (sem_vector [n_sem].num_blocked == 0)
+	if (sem_vector [n_sem].num_blocked <= 0)
 		sem_vector [n_sem].num_blocked++;
 	else {
 		sem_vector [n_sem].num_blocked--;
@@ -433,11 +435,17 @@ int sys_sem_signal (int n_sem) {
 int sys_sem_destroy (int n_sem) {
 	if (n_sem >= NUM_SEMAPHORES || n_sem < 0) return -EINVAL;
 
-	if (sem_vector [n_sem].owner_pid == -1) return -EINVAL;
-
 	if (sem_vector [n_sem].owner_pid == current()->PID) {
 		sem_vector [n_sem].owner_pid   = -1;
-		sem_vector [n_sem].max_blocked = 0;
+		sem_vector [n_sem].max_blocked = 0; //Unblock first!
+		
+		int i;
+		for (i = 0; i < NUM_SEMAPHORES; ++i) {
+			struct list_head* lh = list_first(&(sem_vector [n_sem].blocked_processes));
+			struct task_struct* first = list_head_to_task_struct(lh);
+			update_process_state_rr(first, &readyqueue); //Unblock all blocked processes
+		}
+
 		INIT_LIST_HEAD(&(sem_vector [n_sem].blocked_processes));
 		//TODO Check this out..	
 	}

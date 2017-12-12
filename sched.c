@@ -181,6 +181,7 @@ void task_switch (union task_union* t) {
 
 void inner_task_switch (union task_union* t) {	
 	tss.esp0 = &(t->stack[KERNEL_STACK_SIZE]);
+	ticks_rr = t->task.quantum;
 	if (thread_of(current(), t) == -1) set_cr3 (t->task.dir_pages_baseAddr);
 	__asm__ __volatile__ ( 	"movl %%ebp, %0;" 
 						    "movl %1, %%esp;"
@@ -244,7 +245,7 @@ void sched_next_rr () {
 		task_switch((union task_union*) new);	
 	}
 	
-	else task_switch((union task_union*) idle_task);
+	else task_switch((union task_union*) idle_task); //Modificar estadisticas eh!! TODO
 }
 
 int get_quantum (struct task_struct *t) {
