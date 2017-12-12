@@ -198,7 +198,7 @@ void sys_exit() {
 	int i;
 	for (i = 0; i < NUM_SEMAPHORES; i++) {
 		if (sem_vector [i].owner_pid == in_cpu->PID) {
-			sem_destroy(sem_vector [i].owner_pid);
+			sys_sem_destroy(sem_vector [i].owner_pid);
 		}
 	}
 
@@ -232,7 +232,6 @@ int sys_clone (void (*function)(void), void* stack) {
 		thread->task.info_dir_->num_of++; //Update the number of proccesses on that directory...		
 		
 		thread->stack[KERNEL_STACK_SIZE-2] = stack; 
-		thread->stack[KERNEL_STACK_SIZE-11] = stack;
 		thread->stack[KERNEL_STACK_SIZE-5] = function;
 		thread->stack[KERNEL_STACK_SIZE-18] = 0xaaaa;
 		thread->stack[KERNEL_STACK_SIZE-17] = &ret_from_fork;
