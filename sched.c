@@ -211,14 +211,16 @@ void update_process_state_rr (struct task_struct *t, struct list_head *dst_queue
 		t->state = ST_RUN;
 	}
 	else if (dst_queue == &(readyqueue)) {
-		t->state = ST_READY;
 		
 		current()->stats.system_ticks += get_ticks()-current()->stats.elapsed_total_ticks;
 		current()->stats.elapsed_total_ticks = get_ticks();
 		
+		if (t->state == ST_BLOCKED) list_del(lh);
+		
+		t->state = ST_READY;
 		list_add_tail(lh, dst_queue); //By the moment only ready	
 	}
-	else {
+	else { //From run to blocked
 		t->state = ST_BLOCKED;
 		list_add_tail(lh, dst_queue);
 	}	

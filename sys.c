@@ -341,7 +341,7 @@ int sys_get_stats (int pid, struct stats *st){
  		return -EINVAL;
 	}
 	
-	if (access_ok(VERIFY_WRITE,st,sizeof(struct stats_s)) == 0){
+	if (access_ok(VERIFY_WRITE,st,sizeof(struct stats)) == 0){
 		//Estadisticas RUN_system a RUN_user
 		current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
 		current()->stats.elapsed_total_ticks = get_ticks();
@@ -351,7 +351,7 @@ int sys_get_stats (int pid, struct stats *st){
 
 	//Busqueda del PCB
 	if (current()->PID == pid){
-		copy_to_user(&(current()->stats), st, sizeof(struct stats_s));
+		copy_to_user(&(current()->stats), st, sizeof(struct stats));
 		
 		//Estadisticas RUN_system a RUN_user
 		current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
@@ -362,7 +362,7 @@ int sys_get_stats (int pid, struct stats *st){
 
 	for (i = 0; i < NR_TASKS; ++i){
 		if (task[i].task.PID == pid && task[i].task.state == ST_READY){
-			copy_to_user(&(task[i].task.stats), st, sizeof(struct stats_s));
+			copy_to_user(&(task[i].task.stats), st, sizeof(struct stats));
 
 			//Estadisticas RUN_system a RUN_user
 			current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
@@ -387,7 +387,7 @@ int sys_sem_init (int n_sem, int value) {
 	if (sem_vector [n_sem].owner_pid == -1) { //Checks if it is initialized and also free!
 		sem_vector [n_sem].owner_pid = current()->PID;
 		sem_vector [n_sem].max_blocked = value;
-		sem_vector [n_sem].num_blocked = 0;
+		sem_vector [n_sem].num_blocked = value; //TODO check 'value'
 		//We do nothing with the blocked queue by the moment...
 	}
 	else { 
@@ -408,6 +408,7 @@ int sys_sem_wait (int n_sem) {
 		//Whops, someone must be blocked
 		sem_vector [n_sem].num_blocked++;
 		update_process_state_rr(current(), (&(sem_vector [n_sem].blocked_processes)));
+		sched_next_rr();
 	}
 	else //Desbloquear?????
 		sem_vector [n_sem].num_blocked--;
@@ -423,7 +424,7 @@ int sys_sem_signal (int n_sem) {
 	if (sem_vector [n_sem].num_blocked <= 0)
 		sem_vector [n_sem].num_blocked++;
 	else {
-		sem_vector [n_sem].num_blocked--;
+		//TODO NUM_BLOCKED + 1???
 		struct list_head* lh = list_first(&(sem_vector [n_sem].blocked_processes));
 		struct task_struct* first = list_head_to_task_struct(lh);
 		update_process_state_rr(first, &readyqueue); //Unblock		
@@ -437,17 +438,18 @@ int sys_sem_destroy (int n_sem) {
 
 	if (sem_vector [n_sem].owner_pid == current()->PID) {
 		sem_vector [n_sem].owner_pid   = -1;
-		sem_vector [n_sem].max_blocked = 0; //Unblock first!
-		
-		int i;
-		for (i = 0; i < NUM_SEMAPHORES; ++i) {
+		sem_vector [n_sem].num_blocked = 0;
+	
+		while (!list_empty(&(sem_vector [n_sem].blocked_processes))) {
 			struct list_head* lh = list_first(&(sem_vector [n_sem].blocked_processes));
 			struct task_struct* first = list_head_to_task_struct(lh);
-			update_process_state_rr(first, &readyqueue); //Unblock all blocked processes
+
+			update_process_state_rr(first, &readyqueue);
+			list_del(lh);
 		}
 
-		INIT_LIST_HEAD(&(sem_vector [n_sem].blocked_processes));
-		//TODO Check this out..	
+		sem_vector [n_sem].max_blocked = 0;
+
 	}
 	else 
 		return -EINVAL;

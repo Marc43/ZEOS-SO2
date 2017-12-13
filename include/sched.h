@@ -16,8 +16,8 @@
 
 struct semaphore {
 	int owner_pid;
-	unsigned int num_blocked;
-	unsigned int max_blocked;
+	int num_blocked;
+	int max_blocked;
 	struct list_head blocked_processes;
 };
 
@@ -30,7 +30,7 @@ struct info_dir {
 
 enum state_t { ST_RUN, ST_READY, ST_BLOCKED };
 
-struct stats_s {
+struct stats {
 	unsigned long user_ticks;
 	unsigned long system_ticks;
 	unsigned long blocked_ticks;
@@ -51,10 +51,9 @@ struct task_struct {
   
   struct list_head list; 
 
-  struct stats_s stats;
-
   struct info_dir* info_dir_;
 
+  struct stats stats;
 };
 
 union task_union {
