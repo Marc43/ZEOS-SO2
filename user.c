@@ -10,7 +10,7 @@ int __attribute__ ((__section__(".text.main")))
      /* __asm__ __volatile__ ("mov %0, %%cr3"::"r" (0) ); */
 
 
-	runjp_rank(4, 5);
+	runjp_rank(4, 16);
 	//runjp();
 	while(1) {}	
 }

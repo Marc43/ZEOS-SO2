@@ -228,7 +228,6 @@ void update_process_state_rr (struct task_struct *t, struct list_head *dst_queue
 
 void sched_next_rr () {
 	if (!list_empty(&readyqueue)) {
-
 		struct list_head* lh = list_first(&readyqueue);
 		struct task_struct* new = list_head_to_task_struct(lh);
 		list_del(lh); //Extract the process from the queue
@@ -245,8 +244,7 @@ void sched_next_rr () {
 	
 		//Ponemos el nuevo proceso a ejecutar			
 		task_switch((union task_union*) new);	
-	}
-	
+	}	
 	else task_switch((union task_union*) idle_task); //Modificar estadisticas eh!! TODO
 }
 

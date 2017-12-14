@@ -183,6 +183,8 @@ void sys_exit() {
 
 	struct task_struct* in_cpu = current();
 	page_table_entry* PT = get_PT(in_cpu);
+
+	int pPID = in_cpu->PID;
 	
 	in_cpu->info_dir_->num_of--;
 	if (in_cpu->info_dir_->num_of <= 0) {
@@ -196,9 +198,9 @@ void sys_exit() {
 	}
 
 	int i;
-	for (i = 0; i < NUM_SEMAPHORES; i++) {
-		if (sem_vector [i].owner_pid == in_cpu->PID) {
-			sys_sem_destroy(sem_vector [i].owner_pid);
+	for (i = 0; i < 20; i++) { //NUM_SEMAPHORES
+		if (sem_vector [i].owner_pid == pPID) {
+			sys_sem_destroy(i);
 		}
 	}
 
@@ -406,11 +408,10 @@ int sys_sem_wait (int n_sem) {
 
 	if (sem_vector [n_sem].num_blocked <= 0) {
 		//Whops, someone must be blocked
-		sem_vector [n_sem].num_blocked++;
 		update_process_state_rr(current(), (&(sem_vector [n_sem].blocked_processes)));
 		sched_next_rr();
 	}
-	else //Desbloquear?????
+	else
 		sem_vector [n_sem].num_blocked--;
 		
 	return 0;
@@ -421,13 +422,15 @@ int sys_sem_signal (int n_sem) {
 
 	if (sem_vector [n_sem].owner_pid == -1) return -EINVAL;
 
-	if (sem_vector [n_sem].num_blocked <= 0)
+	if (sem_vector [n_sem].num_blocked > 0)
 		sem_vector [n_sem].num_blocked++;
-	else {
+	else if (!list_empty(&(sem_vector [n_sem].blocked_processes))){
 		//TODO NUM_BLOCKED + 1???
 		struct list_head* lh = list_first(&(sem_vector [n_sem].blocked_processes));
 		struct task_struct* first = list_head_to_task_struct(lh);
 		update_process_state_rr(first, &readyqueue); //Unblock		
+	
+		if (sem_vector [n_sem].num_blocked < sem_vector [n_sem].max_blocked)sem_vector [n_sem].num_blocked++;
 	}
 
 	return 0;
@@ -436,16 +439,20 @@ int sys_sem_signal (int n_sem) {
 int sys_sem_destroy (int n_sem) {
 	if (n_sem >= NUM_SEMAPHORES || n_sem < 0) return -EINVAL;
 
+	int some_blocked = 0;
 	if (sem_vector [n_sem].owner_pid == current()->PID) {
 		sem_vector [n_sem].owner_pid   = -1;
 		sem_vector [n_sem].num_blocked = 0;
+
+		struct list_head* blocked_queue = &(sem_vector[n_sem].blocked_processes);
 	
-		while (!list_empty(&(sem_vector [n_sem].blocked_processes))) {
+		while (!blocked_queue) {
+			if (some_blocked == 0) some_blocked = -1;
 			struct list_head* lh = list_first(&(sem_vector [n_sem].blocked_processes));
 			struct task_struct* first = list_head_to_task_struct(lh);
+			list_del(lh);
 
 			update_process_state_rr(first, &readyqueue);
-			list_del(lh);
 		}
 
 		sem_vector [n_sem].max_blocked = 0;
@@ -454,5 +461,5 @@ int sys_sem_destroy (int n_sem) {
 	else 
 		return -EINVAL;
 
-	return 0;
+	return some_blocked;
 }
