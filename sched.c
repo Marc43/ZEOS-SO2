@@ -46,7 +46,7 @@ int allocate_DIR(struct task_struct *t)
 	//Search the first free DIR
 	int i = 0; int found = 0;
 	while (!found  && i < NR_TASKS) { 
-		if (dir_ [i].valid == 0) found = 1;	
+		if (dir_ [i].valid == 0) {found = 1; dir_ [i].valid = 1;}	
 		++i;
 	}
 	if (i >= NR_TASKS) return -1; 
@@ -182,7 +182,7 @@ void task_switch (union task_union* t) {
 void inner_task_switch (union task_union* t) {	
 	tss.esp0 = &(t->stack[KERNEL_STACK_SIZE]);
 	ticks_rr = t->task.quantum;
-	if (thread_of(current(), t) == -1) set_cr3 (t->task.dir_pages_baseAddr);
+	if (thread_of(current(), (struct task_struct*)t) == -1) set_cr3 (t->task.dir_pages_baseAddr);
 	__asm__ __volatile__ ( 	"movl %%ebp, %0;" 
 						    "movl %1, %%esp;"
 							"popl %%ebp;"

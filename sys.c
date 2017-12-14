@@ -198,7 +198,7 @@ void sys_exit() {
 	}
 
 	int i;
-	for (i = 0; i < 20; i++) { //NUM_SEMAPHORES
+	for (i = 0; i < NUM_SEMAPHORES; i++) { //NUM_SEMAPHORES
 		if (sem_vector [i].owner_pid == pPID) {
 			sys_sem_destroy(i);
 		}
@@ -335,7 +335,7 @@ int sys_get_stats (int pid, struct stats *st){
 
 	int i;
 	
-	if (pid < 0 ){
+	if (pid < 0) {
 		//Estadisticas RUN_system a RUN_user
 		current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
 		current()->stats.elapsed_total_ticks = get_ticks();
@@ -410,6 +410,7 @@ int sys_sem_wait (int n_sem) {
 		//Whops, someone must be blocked
 		update_process_state_rr(current(), (&(sem_vector [n_sem].blocked_processes)));
 		sched_next_rr();
+		if (sem_vector [n_sem].owner_pid == -1) return -EINVAL;
 	}
 	else
 		sem_vector [n_sem].num_blocked--;
@@ -430,7 +431,7 @@ int sys_sem_signal (int n_sem) {
 		struct task_struct* first = list_head_to_task_struct(lh);
 		update_process_state_rr(first, &readyqueue); //Unblock		
 	
-		if (sem_vector [n_sem].num_blocked < sem_vector [n_sem].max_blocked)sem_vector [n_sem].num_blocked++;
+		if (sem_vector [n_sem].num_blocked < sem_vector [n_sem].max_blocked) sem_vector [n_sem].num_blocked++;
 	}
 
 	return 0;
@@ -450,7 +451,7 @@ int sys_sem_destroy (int n_sem) {
 			if (some_blocked == 0) some_blocked = -1;
 			struct list_head* lh = list_first(&(sem_vector [n_sem].blocked_processes));
 			struct task_struct* first = list_head_to_task_struct(lh);
-			list_del(lh);
+			//list_del(lh);
 
 			update_process_state_rr(first, &readyqueue);
 		}
