@@ -43,15 +43,26 @@ page_table_entry * get_PT (struct task_struct *t)
 
 int allocate_DIR(struct task_struct *t) 
 {
+	
+	if (t->PID == 0) {
+		dir_ [0].valid = 1;
+		dir_ [0].num_of = 1;	    
+
+		t->info_dir_ = &(dir_ [0]);
+	    t->dir_pages_baseAddr = (page_table_entry*) &dir_pages[0];
+	
+		return 1;	
+	}
+
 	//Search the first free DIR
-	int i = 0; int found = 0;
+	int i = 1; int found = 0;
 	while (!found  && i < NR_TASKS) { 
-		if (dir_ [i].valid == 0) {found = 1; dir_ [i].valid = 1;}	
+		if (dir_ [i].valid == 0) found = 1;	
 		++i;
 	}
 	if (i >= NR_TASKS) return -1; 
 
-	dir_ [i].valid = 1;
+	dir_ [i].valid  = 1;
 	dir_ [i].num_of = 1;
 
 	t->info_dir_ = &(dir_ [i]);	
@@ -109,7 +120,7 @@ void init_task1(void) {
 	
 		struct task_struct* task1 = list_head_to_task_struct(lh);
 		task1->PID = last_PID++;
-		allocate_DIR(task1);
+	    allocate_DIR(task1);
 		set_user_pages(task1); //Initialize pages for task1
 		set_cr3(task1->dir_pages_baseAddr);
 		
@@ -133,13 +144,13 @@ void init_task1(void) {
 	}
 }
 
-void init_sched(){
+void init_sched(){ 
+	init_dir_structure();
 	init_free_queue();
 	init_ready_queue();
 	init_idle();
 	init_task1();
 	init_semaphores();
-	init_dir_structure();
 }
 
 struct task_struct* current()
@@ -278,7 +289,7 @@ void init_semaphores() {
 
 void init_dir_structure() {
 	int i;
-	for (i = 0; i < NR_TASKS; ++i) {
+	for (i = 1; i < NR_TASKS; ++i) {
 		dir_ [i].valid = 0;
 		dir_ [i].num_of = 0;
 	}

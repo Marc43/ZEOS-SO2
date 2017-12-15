@@ -111,7 +111,8 @@ int sys_fork(){
 	}
 	
 	copy_data(parent_union, child_union, sizeof(union task_union));
-	allocate_DIR(&(child_union->task));
+	
+	if (!allocate_DIR(&(child_union->task))) return -ENOMEM;
 
 	i = 0;
 	page_table_entry* PT_child = get_PT(&(child_union->task));
@@ -409,8 +410,8 @@ int sys_sem_wait (int n_sem) {
 	if (sem_vector [n_sem].num_blocked <= 0) {
 		//Whops, someone must be blocked
 		update_process_state_rr(current(), (&(sem_vector [n_sem].blocked_processes)));
-		sched_next_rr();
-		if (sem_vector [n_sem].owner_pid == -1) return -EINVAL;
+		sched_next_rr(); //The next instruction will be executed when the sem. is destroyed or it is unblocked
+		if (sem_vector [n_sem].owner_pid == -1) return -EINVAL; 
 	}
 	else
 		sem_vector [n_sem].num_blocked--;
@@ -423,15 +424,12 @@ int sys_sem_signal (int n_sem) {
 
 	if (sem_vector [n_sem].owner_pid == -1) return -EINVAL;
 
-	if (sem_vector [n_sem].num_blocked > 0)
+	if (sem_vector [n_sem].num_blocked > 0 || list_empty(&(sem_vector [n_sem].blocked_processes)))
 		sem_vector [n_sem].num_blocked++;
 	else if (!list_empty(&(sem_vector [n_sem].blocked_processes))){
-		//TODO NUM_BLOCKED + 1???
 		struct list_head* lh = list_first(&(sem_vector [n_sem].blocked_processes));
 		struct task_struct* first = list_head_to_task_struct(lh);
-		update_process_state_rr(first, &readyqueue); //Unblock		
-	
-		if (sem_vector [n_sem].num_blocked < sem_vector [n_sem].max_blocked) sem_vector [n_sem].num_blocked++;
+		update_process_state_rr(first, &readyqueue); //Unblock			
 	}
 
 	return 0;
