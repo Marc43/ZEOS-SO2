@@ -463,15 +463,18 @@ int sys_sem_destroy (int n_sem) {
 }
 
 int sys_read (int fd, char* buf, int count) {
-	if (fd != 0) return -EINVAL; //Not read
+	if (fd != 0) return -EBADF; //Not read
 	if (count <= 0) return -EINVAL;
-	if (!access_ok(VERIFY_WRITE, buf[0], count)) return -EINVAL;
+	if (!access_ok(VERIFY_WRITE, &buf[0], count)) return -EBADF;
  
 	//TODO DOES NOT CONTEMPLATE ANY CASE OF COUNT > SIZE OF USER_BUFFER
 
-	current()->iorb.ubuf = buf;
+	current()->iorb.ubuf      = buf;
 	current()->iorb.remaining = count;
+	current()->iorb.last_pos  = 0; 
 
-	return sys_read_keyboard();
+	while (sys_read_keyboard() != 0);
+
+	return 1;
 	
 }

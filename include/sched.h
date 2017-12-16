@@ -43,6 +43,7 @@ struct stats {
 struct iorb {
 	char* ubuf;
 	int	  remaining;
+	int	  last_pos;
 	//Incomplete iorb bc is just for reading
 };
 

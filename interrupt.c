@@ -5,6 +5,7 @@
 #include <interrupt.h>
 #include <segment.h>
 #include <hardware.h>
+#include <devices.h>
 #include <io.h>
 
 #include <zeos_interrupt.h>
@@ -16,6 +17,8 @@ Gate idt[IDT_ENTRIES];
 Register    idtR;
 unsigned long int zeos_ticks = 0;
 
+extern struct list_head blocked;
+extern char	  *write;
 
 char char_map[] =
 {
@@ -122,10 +125,19 @@ void keyboard_routine () {
   	unsigned char char_to_print = ' ';
 	read_keyboard(&char_to_print);
 	printc_xy(0x00, 0x00, char_to_print);
+
+	//We only care about the char if there are any processes waiting for it, otherwise, we don't save it
+	//If there is no one reading (empty iobuf) and someone's waiting
+
+	if (!list_empty(&blocked)) {
+		write_char_to_iobuf(char_to_print);
 	
-/*	do {
-	  printc_xy(0x00, 0x00, char_to_print);
-	}
-	while (read_keyboard(&char_to_print));		*/
+		struct list_head* lh  = list_first(&blocked);
+		struct task_struct* t = list_head_to_task_struct(lh);
+
+		if (len_iobuf() == t->iorb.remaining) 
+			update_process_state_rr(t, &readyqueue); //Run little one, run
+		
+	}		
 }
 
