@@ -248,3 +248,20 @@ int sem_destroy (int n_sem) {
 
 	return ret;
 }
+
+int read (int fd, char* buf, int count) {
+	int ret = -1;
+	__asm__ __volatile__ ("movl $3, %%eax;"
+						  "int $0x80;"	
+						  "movl %%eax, %0;"
+						  : "=m" (ret)
+  						  : "b"  (fd), "c" (buf), "d" (count)
+						  : "eax");
+
+	if (ret < 0) {
+		errno = ret;
+		ret = -1;
+	}
+
+	return ret;
+}
