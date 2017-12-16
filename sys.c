@@ -461,3 +461,17 @@ int sys_sem_destroy (int n_sem) {
 
 	return some_blocked;
 }
+
+int sys_read (int fd, char* buf, int count) {
+	if (fd != 0) return -EINVAL; //Not read
+	if (count <= 0) return -EINVAL;
+	if (!access_ok(VERIFY_WRITE, buf[0], count)) return -EINVAL;
+ 
+	//TODO DOES NOT CONTEMPLATE ANY CASE OF COUNT > SIZE OF USER_BUFFER
+
+	current()->iorb.ubuf = buf;
+	current()->iorb.remaining = count;
+
+	return sys_read_keyboard();
+	
+}
