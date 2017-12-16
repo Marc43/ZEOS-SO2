@@ -58,7 +58,7 @@ int allocate_DIR(struct task_struct *t)
 	int i = 1; int found = 0;
 	while (!found  && i < NR_TASKS) { 
 		if (dir_ [i].valid == 0) found = 1;	
-		++i;
+	    else ++i;
 	}
 	if (i >= NR_TASKS) return -1; 
 

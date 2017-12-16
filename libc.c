@@ -169,12 +169,12 @@ int get_stats (int pid, struct stats *st){
 	int ret = 0;				// Identificador de llamada a sistema: 35
 	__asm__ __volatile__ ("movl 	$35, %%eax;"
 			      "int 	$0x80;"
-			      "movl 	%%eax, %0;"
+			      "movl %%eax, %0;"
 			      : "=m" (ret)
 			      : "b" (pid), "c" (st)
 			      : "eax");
 	if (ret < 0){
-		errno = -ret;
+		errno = ret;
 		ret = -1;
 	}
 

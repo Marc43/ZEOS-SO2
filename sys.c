@@ -396,7 +396,7 @@ int sys_sem_init (int n_sem, int value) {
 	else { 
 		printk("That semaphore already exists!");
 		
-		return -EINVAL;
+		return -EBUSY;
 	}
 
 	return 0;	
@@ -449,7 +449,6 @@ int sys_sem_destroy (int n_sem) {
 			if (some_blocked == 0) some_blocked = -1;
 			struct list_head* lh = list_first(&(sem_vector [n_sem].blocked_processes));
 			struct task_struct* first = list_head_to_task_struct(lh);
-			//list_del(lh);
 
 			update_process_state_rr(first, &readyqueue);
 		}
