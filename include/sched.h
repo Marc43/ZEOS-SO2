@@ -47,6 +47,11 @@ struct iorb {
 	//Incomplete iorb bc is just for reading
 };
 
+struct heap {
+	int   bytes_allocated;
+	void* pointer_byte;
+};
+
 struct task_struct {
   int PID;			/* Process ID. This MUST be the first field of the struct. */
   page_table_entry* dir_pages_baseAddr;
@@ -63,6 +68,8 @@ struct task_struct {
   struct stats stats;
 
   struct iorb iorb;
+
+  struct heap heap;
 };
 
 union task_union {

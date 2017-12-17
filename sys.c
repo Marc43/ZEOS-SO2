@@ -478,3 +478,21 @@ int sys_read (int fd, char* buf, int count) {
 	return count;
 	
 }
+
+void *sbrk(int increment) {
+	//Each process has its own HEAP, by default it will be NULL (0 frames in the heap)
+	
+	if (increment > 0) {
+		//If it's a positive increment greater than 0 and it's 
+		current()->heap.bytes_allocated += increment;
+		void *new_dir  = (void *)(increment) + current()->heap.pointer_byte; 
+		int new_frames = 0x000000001 & (new_dir - current()->heap.pointer_byte) >> 12;
+		
+		page_table_entry* PT = get_PT((union task_union*)(&(current())));
+		while (new_frames != 0) {
+			//TODO Alloc frames
+			set_ss_pag(PT, i, alloc_frame()); //TODO The 'i'... well... After KERNEL+CODE+DATA ????
+			new_frames--;
+		}
+	} 
+}

@@ -265,3 +265,18 @@ int read (int fd, char* buf, int count) {
 
 	return ret;
 }
+
+void *sbrk(int increment) {
+	int ret = -1;
+	__asm__ __volatile__ ("movl $15, %%eax;"
+						  "int $0x80;"
+						  "movl %%eax, %0;"
+						  : "=m" (ret)
+						  : "b" (increment)
+						  : "eax");
+	
+	if (ret < 0)
+		errno = -ENOMEM;
+
+	return ret;
+}
