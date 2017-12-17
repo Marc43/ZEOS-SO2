@@ -32,9 +32,10 @@ void init_io_structures () {
 }
 
 int is_empty_iobuf() {
-	if (write == read) return 1;
+	if (write == read)
+		return 1;
 	
-	return -1;
+	return 0;
 }
 
 void update_rw_pointer (char** pointer) {
@@ -50,18 +51,21 @@ int copy_to_ubuf (int count) {
 	//Copy to the IORB buffer (ubuf)
 	int to_read = write - read;
 
-	if (!is_empty_iobuf() && to_read < count) return 1;
+	if (is_empty_iobuf() && to_read < count) return -1;
 	
 	int i = current()->iorb.last_pos;
 	int readen = 1;	
 	while (!is_empty_iobuf() && readen <= count) {
-		current()->iorb.ubuf [i] = (char)(*(&read));
+		current()->iorb.ubuf [i] = (char)(*read);
 		update_rw_pointer(&read);
 		++i; readen++;
 	}
 
-	if (readen != 1) current()->iorb.remaining -= readen;
-	
+	if (readen != 1) {
+		current()->iorb.remaining -= readen-1;
+		current()->iorb.last_pos = i;
+	}
+
 	return current()->iorb.remaining; 
 } //Returns the amount of characters left to read...
 
@@ -84,12 +88,12 @@ int sys_read_keyboard() {
 
 	//Now, we actually read
 	while (1) {
-		int k = copy_to_ubuf(current()->iorb.remaining);
-		if (k != 0) {
+		if (copy_to_ubuf(current()->iorb.remaining) != 0) {
 			current()->state = ST_BLOCKED;
 			list_add(&(current()->list), &blocked);
 			sched_next_rr();
 		}
-		else return 1;
+		else 
+			return 0;
 	}
 }

@@ -473,8 +473,8 @@ int sys_read (int fd, char* buf, int count) {
 	current()->iorb.remaining = count;
 	current()->iorb.last_pos  = 0; 
 
-	while (sys_read_keyboard() != 0);
+	while (sys_read_keyboard());
 
-	return 1;
+	return count;
 	
 }
