@@ -484,15 +484,25 @@ void *sbrk(int increment) {
 	
 	if (increment > 0) {
 		//If it's a positive increment greater than 0 and it's 
-		current()->heap.bytes_allocated += increment;
 		void *new_dir  = (void *)(increment) + current()->heap.pointer_byte; 
-		int new_frames = 0x000000001 & (new_dir - current()->heap.pointer_byte) >> 12;
+		int new_frames = (new_dir - current()->heap.pointer_byte) >> 12; //Pag. number
 		
 		page_table_entry* PT = get_PT((union task_union*)(&(current())));
-		while (new_frames != 0) {
+		
+		int k = 1;
+		int i = 0;
+		unsigned int ph_pages [new_frames];
+		while (i < new_frames && k > 0) {
 			//TODO Alloc frames
-			set_ss_pag(PT, i, alloc_frame()); //TODO The 'i'... well... After KERNEL+CODE+DATA ????
-			new_frames--;
+			k = ph_pages [i] = alloc_frame();
+			set_ss_pag(PT, current()->heap.last_logical, k); //TODO The 'i'... well... After KERNEL+CODE+DATA ????
+			i++; current()->heap.last_logical++; 
 		}
+
+		if (k < 0) {
+			//TODO Free frames 
+			return -ENOMEM;
+		}
+
 	} 
 }

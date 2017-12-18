@@ -48,7 +48,7 @@ struct iorb {
 };
 
 struct heap {
-	int   bytes_allocated;
+	int	  last_logical;
 	void* pointer_byte;
 };
 
