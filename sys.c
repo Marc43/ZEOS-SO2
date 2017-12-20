@@ -167,6 +167,14 @@ int sys_fork(){
 	child_union->task.stats.total_trans = 0;
 	child_union->task.stats.remaining_ticks = 0;
 	child_union->task.stats.elapsed_total_ticks = get_ticks();
+
+	//Heap 
+	child_union->task.heap.last_logical = NUM_PAG_KERNEL + NUM_PAG_CODE + (2*NUM_PAG_DATA);
+	child_union->task.heap.pointer_byte = (NUM_PAG_KERNEL + NUM_PAG_CODE + (2*NUM_PAG_DATA))*PAGE_SIZE;
+
+	i = alloc_frame();
+	if (i > 0) set_ss_pag(PT_child, child_union->task.heap.last_logical++, i);
+	else return -ENOMEM;
 	
 	list_add_tail(&(child_union->task.list), &readyqueue);
 	
@@ -479,30 +487,44 @@ int sys_read (int fd, char* buf, int count) {
 	
 }
 
-void *sbrk(int increment) {
+void *sys_sbrk(int increment) {
 	//Each process has its own HEAP, by default it will be NULL (0 frames in the heap)
-	
 	if (increment > 0) {
 		//If it's a positive increment greater than 0 and it's 
-		void *new_dir  = (void *)(increment) + current()->heap.pointer_byte; 
+		void *ini	   = current()->heap.pointer_byte;
+		void *new_dir  = (void *)((increment) + ini); 
 		int new_frames = (new_dir - current()->heap.pointer_byte) >> 12; //Pag. number
 		
-		page_table_entry* PT = get_PT((union task_union*)(&(current())));
+		page_table_entry* PT = get_PT(current());
 		
 		int k = 1;
 		int i = 0;
 		unsigned int ph_pages [new_frames];
+		
+		int aux_ll = current()->heap.last_logical;
 		while (i < new_frames && k > 0) {
-			//TODO Alloc frames
 			k = ph_pages [i] = alloc_frame();
-			set_ss_pag(PT, current()->heap.last_logical, k); //TODO The 'i'... well... After KERNEL+CODE+DATA ????
-			i++; current()->heap.last_logical++; 
+			set_ss_pag(PT, aux_ll++, k);
+			i++;
 		}
 
 		if (k < 0) {
-			//TODO Free frames 
+			int j;
+			for (j = 0; j < i; ++j) {
+				free_frame(ph_pages [j]);
+				del_ss_pag(PT, --aux_ll);
+			}
+			
 			return -ENOMEM;
 		}
+		
+		current()->heap.last_logical = aux_ll;
+		current()->heap.pointer_byte = new_dir;
 
-	} 
+		return ini;
+	}
+	else if (increment == 0) return current()->heap.pointer_byte; 
+	else { //Substract
+		
+	}
 }

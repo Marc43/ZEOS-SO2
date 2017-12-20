@@ -139,7 +139,15 @@ void init_task1(void) {
 		task1->stats.total_trans = 0;
 		task1->stats.remaining_ticks = QUANTUM;
 		task1->stats.elapsed_total_ticks = get_ticks();
-		
+	
+		task1->heap.last_logical = NUM_PAG_KERNEL + NUM_PAG_CODE + (2*NUM_PAG_DATA);
+		task1->heap.pointer_byte = (NUM_PAG_KERNEL + NUM_PAG_CODE + (2*NUM_PAG_DATA))*PAGE_SIZE;			
+
+		page_table_entry* PT = get_PT(&(task1));
+
+		int i = alloc_frame();
+		if (i > 0) set_ss_pag(PT, task1->heap.last_logical++, i);
+	
 		update_process_state_rr(task1, NULL);
 	}
 }
