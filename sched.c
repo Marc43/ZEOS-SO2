@@ -139,7 +139,7 @@ void init_task1(void) {
 		task1->stats.total_trans = 0;
 		task1->stats.remaining_ticks = QUANTUM;
 		task1->stats.elapsed_total_ticks = get_ticks();
-		
+	
 		update_process_state_rr(task1, NULL);
 	}
 }

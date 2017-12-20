@@ -3,7 +3,7 @@
 #include <list.h>
 #include <sched.h>
 
-#define IO_BUFFER_SIZE 1024
+#define IO_BUFFER_SIZE 15
 
 // Queue for blocked processes in I/O 
 struct list_head blocked;
@@ -11,6 +11,8 @@ struct list_head blocked;
 char io_buffer [IO_BUFFER_SIZE];
 char *write;
 char * read;
+
+int pot_full = 0;
 
 /* A read from the keyboard blocks a process if there are other
    processess waiting for their I/O or in it's defect if it did not
@@ -31,16 +33,9 @@ void init_io_structures () {
 	write = read = &(io_buffer [0]); 
 }
 
-int is_empty_iobuf() {
-	if (write == read)
-		return 1;
-	
-	return 0;
-}
-
 void update_rw_pointer (char** pointer) {
 	//This is used for io_buffer
-	if (*pointer - &(io_buffer[0]) == IO_BUFFER_SIZE-1) *pointer = io_buffer [0];
+	if (*pointer - &(io_buffer[0]) + 1 == IO_BUFFER_SIZE) {*pointer = &io_buffer [0]; pot_full = 1;}
 	else ++(*pointer);
 
 	/* If we've reached the end of the structure start over again,
@@ -49,13 +44,13 @@ void update_rw_pointer (char** pointer) {
 
 int copy_to_ubuf (int count) { 
 	//Copy to the IORB buffer (ubuf)
-	int to_read = write - read;
+	int to_read = len_iobuf();
 
-	if (is_empty_iobuf() && to_read < count) return -1;
+	if (to_read < count && !full_iobuf()) {pot_full = 0; return -1;}
 	
 	int i = current()->iorb.last_pos;
 	int readen = 1;	
-	while (!is_empty_iobuf() && readen <= count) {
+	while (readen <= count) { //TODO Check that we do not exceed ubuf size!
 		current()->iorb.ubuf [i] = (char)(*read);
 		update_rw_pointer(&read);
 		++i; readen++;
@@ -71,11 +66,20 @@ int copy_to_ubuf (int count) {
 
 void write_char_to_iobuf(char c) {
 	*(write) = c;
-	 update_rw_pointer(&write);
+	update_rw_pointer(&write);
+}
+
+int full_iobuf() {
+	if (write == read && pot_full) return 1;
+
+	return 0;
 }
 
 int len_iobuf() {
-	return write - read;
+	if (write >= read)
+		return write - read;
+
+	return  IO_BUFFER_SIZE - (read - write);
 }
 
 int sys_read_keyboard() {
