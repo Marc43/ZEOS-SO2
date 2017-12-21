@@ -147,6 +147,7 @@ void init_task1(void) {
 
 		int i = alloc_frame();
 		if (i > 0) set_ss_pag(PT, task1->heap.last_logical++, i);
+		else return -ENOMEM;
 	
 		update_process_state_rr(task1, NULL);
 	}

@@ -474,8 +474,6 @@ int sys_read (int fd, char* buf, int count) {
 	if (fd != 0) return -EBADF; //Not read
 	if (count <= 0) return -EINVAL;
 	if (!access_ok(VERIFY_WRITE, &buf[0], count)) return -EBADF;
- 
-	//TODO DOES NOT CONTEMPLATE ANY CASE OF COUNT > SIZE OF USER_BUFFER
 
 	current()->iorb.ubuf      = buf;
 	current()->iorb.remaining = count;
@@ -521,10 +519,31 @@ void *sys_sbrk(int increment) {
 		current()->heap.last_logical = aux_ll;
 		current()->heap.pointer_byte = new_dir;
 
+		//if (!(access_ok(VERIFY_WRITE, ini, increment) && access_ok(VERIFY_READ, ini, increment))) return -EFAULT;
+
 		return ini;
 	}
 	else if (increment == 0) return current()->heap.pointer_byte; 
 	else { //Substract
-		
+		void *ini     = current()->heap.pointer_byte;
+		void *new_dir = (void *)(ini + increment);
+		int	bb_frames = (ini - new_dir) >> 12;
+
+		page_table_entry* PT = get_PT(current());
+
+		int i = 0;
+		int aux_ll = current()->heap.last_logical;
+		while (i < bb_frames) {
+			free_frame(get_frame(PT, aux_ll));
+			del_ss_pag(PT, aux_ll--);
+			++i;
+		}
+
+		current()->heap.last_logical = aux_ll;
+		current()->heap.pointer_byte = new_dir;
+
+		//if (!(access_ok(VERIFY_WRITE, new_dir, increment) && access_ok(VERIFY_READ, new_dir, increment))) return -EFAULT;
+
+		return new_dir;
 	}
 }
