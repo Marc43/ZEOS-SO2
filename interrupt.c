@@ -5,6 +5,7 @@
 #include <interrupt.h>
 #include <segment.h>
 #include <hardware.h>
+#include <devices.h>
 #include <io.h>
 
 #include <zeos_interrupt.h>
@@ -16,6 +17,8 @@ Gate idt[IDT_ENTRIES];
 Register    idtR;
 unsigned long int zeos_ticks = 0;
 
+extern struct list_head blocked;
+extern char	  *write;
 
 char char_map[] =
 {
@@ -97,17 +100,14 @@ void setIdt()
 
 int read_keyboard(unsigned char* letter) {
 	unsigned char lecture = inb(0x60);
-	unsigned char last_bit = lecture >> 7;
 	unsigned char bits = lecture & 0b01111111;
-
+	int last_bit = lecture >> 7;
+	
 	*letter = char_map [bits];
 
 	if (*letter == '\0') *letter = 'C';
-	if (!last_bit) { //0 means the user keep pressing the key, so..	
-		return 1;
-	}
-	else return -1;
 	
+	return last_bit;	
 }
 
 extern struct task_struct *idle_task;
@@ -120,12 +120,21 @@ void clock_routine (){
 
 void keyboard_routine () {
   	unsigned char char_to_print = ' ';
-	read_keyboard(&char_to_print);
+	int make = read_keyboard(&char_to_print);
 	printc_xy(0x00, 0x00, char_to_print);
+
+	//We only care about the char if there are any processes waiting for it, otherwise, we don't save it
+	//SI esta full del estambul primero habra que leer y despues escribir!
+	if (!list_empty(&blocked) && make == 0) {
+		if (!full_iobuf()) 
+			write_char_to_iobuf(char_to_print);	
 	
-/*	do {
-	  printc_xy(0x00, 0x00, char_to_print);
-	}
-	while (read_keyboard(&char_to_print));		*/
+		struct list_head* lh  = list_first(&blocked);
+		struct task_struct* t = list_head_to_task_struct(lh);
+
+		if (len_iobuf() == t->iorb.remaining || full_iobuf()) 
+			update_process_state_rr(t, &readyqueue); //Run little one, run
+		
+	}		
 }
 

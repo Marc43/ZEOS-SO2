@@ -84,7 +84,7 @@ int __attribute__((__section__(".text.main")))
 
   /* Initialize Memory */
   init_mm();
-	
+  init_io_structures();	
   init_sched();
 
   /* Move user code/data now (after the page table initialization) */

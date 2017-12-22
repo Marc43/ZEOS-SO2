@@ -43,7 +43,9 @@ page_table_entry * get_PT (struct task_struct *t)
 
 int allocate_DIR(struct task_struct *t) 
 {
-    if (t->PID == 0) {
+	
+	if (t->PID == 0) {
+
 		dir_ [0].valid = 1;
 		dir_ [0].num_of = 1;	    
 
@@ -51,17 +53,19 @@ int allocate_DIR(struct task_struct *t)
 	    t->dir_pages_baseAddr = (page_table_entry*) &dir_pages[0];
 	
 		return 1;	
-	}	
-    
-    //Search the first free DIR
+
+	}
+
+	//Search the first free DIR
 	int i = 1; int found = 0;
 	while (!found  && i < NR_TASKS) { 
 		if (dir_ [i].valid == 0) found = 1;	
-		else ++i;
-	}
+	    else ++i;
+	}	
+    
 	if (i >= NR_TASKS) return -1; 
 
-	dir_ [i].valid = 1;
+	dir_ [i].valid  = 1;
 	dir_ [i].num_of = 1;
 
 	t->info_dir_ = &(dir_ [i]);	
@@ -122,9 +126,11 @@ void init_task1(void) {
 		union task_union* tu = (union task_union*)task1;
 		
 		task1->PID = last_PID++;
+
 		task1->quantum = QUANTUM;	// Recibe todo el quantum
 		
 		allocate_DIR(task1);
+
 		set_user_pages(task1); //Initialize pages for task1
 		tss.esp0 =(DWord)&(tu->stack[KERNEL_STACK_SIZE]);
 	
@@ -144,15 +150,23 @@ void init_task1(void) {
 		task1->stats.total_trans = 0;
 		task1->stats.remaining_ticks = 0;
 		task1->stats.elapsed_total_ticks = get_ticks();
-		
-		task1->state = ST_RUN;
-		//update_process_state_rr(task1, NULL);
+	
+		task1->heap.last_logical = NUM_PAG_KERNEL + NUM_PAG_CODE + (2*NUM_PAG_DATA);
+		task1->heap.pointer_byte = (NUM_PAG_KERNEL + NUM_PAG_CODE + (2*NUM_PAG_DATA))*PAGE_SIZE;			
+    task1->state = ST_RUN;
+ 
+		page_table_entry* PT = get_PT(&(task1));
+
+		int i = alloc_frame();
+		if (i > 0) set_ss_pag(PT, task1->heap.last_logical++, i);
+	
+		update_process_state_rr(task1, NULL);
 	}
 }
 
-void init_sched(){
+void init_sched(){ 
 	init_dir_structure();
-    init_free_queue();
+	init_free_queue();
 	init_ready_queue();
 	init_idle();
 	init_task1();
@@ -203,6 +217,9 @@ void task_switch (union task_union* t) {
 }
 
 void inner_task_switch (union task_union* t) {	
+	tss.esp0 = &(t->stack[KERNEL_STACK_SIZE]);
+	ticks_rr = t->task.quantum;
+	if (thread_of(current(), (struct task_struct*)t) == -1) set_cr3 (t->task.dir_pages_baseAddr);
 
 	__asm__ __volatile__ ( 	"movl %%ebp, %0;" 
 			        "movl %1, %%esp;"
@@ -241,7 +258,7 @@ void update_process_state_rr (struct task_struct *t, struct list_head *dst_queue
 	// Proceso va a la cola de ready's
 
 	else if (dst_queue == &(readyqueue)) {
-		
+
 		if (t->state == ST_BLOCKED){
 			// si el proceso viene de la cola de procesos bloqueados
 			t->stats.blocked_ticks += get_ticks() - t->stats.elapsed_total_ticks;
@@ -279,7 +296,6 @@ void update_process_state_rr (struct task_struct *t, struct list_head *dst_queue
 
 void sched_next_rr () {
 	if (!list_empty(&readyqueue)) {
-
 		struct list_head* lh = list_first(&readyqueue);
 		struct task_struct* new = list_head_to_task_struct(lh);
 		list_del(lh); //Extract the process from the queue

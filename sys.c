@@ -25,8 +25,10 @@ extern unsigned long last_PID;
 
 int check_fd(int fd, int permissions)
 {
-  if (fd!=1) return -9; /*EBADF*/
-  if (permissions!=ESCRIPTURA) return -13; /*EACCES*/
+  if (fd!=1 && fd != 0) return -9; /*EBADF*/
+  if (permissions!=ESCRIPTURA && fd == 1) return -13; /*EACCES*/	
+  if (permissions!=LECTURA && fd == 0) return -13; /*EACCES*/	
+	
   return 0;
 }
 
@@ -111,6 +113,7 @@ int sys_fork(){
 	}
 	
 	copy_data(parent_union, child_union, sizeof(union task_union));
+
 	if (!allocate_DIR(&(child_union->task))) return -ENOMEM;
 
 	i = 0;
@@ -166,6 +169,14 @@ int sys_fork(){
 	child_union->task.stats.total_trans = 0;
 	child_union->task.stats.remaining_ticks = 0;
 	child_union->task.stats.elapsed_total_ticks = get_ticks();
+
+	//Heap 
+	child_union->task.heap.last_logical = PAG_LOG_INIT_DATA + (2*NUM_PAG_DATA);
+	child_union->task.heap.pointer_byte = (PAG_LOG_INIT_DATA + (2*NUM_PAG_DATA))*PAGE_SIZE;
+
+	i = alloc_frame();
+	if (i > 0) set_ss_pag(PT_child, child_union->task.heap.last_logical++, i);
+	else return -ENOMEM;
 	
 	list_add_tail(&(child_union->task.list), &readyqueue);
 	
@@ -183,6 +194,8 @@ void sys_exit() {
 
 	struct task_struct* in_cpu = current();
 	page_table_entry* PT = get_PT(in_cpu);
+
+	int pPID = in_cpu->PID;
 	
 	int pPID = in_cpu->PID;
 
@@ -335,7 +348,7 @@ int sys_get_stats (int pid, struct stats *st){
 
 	int i;
 	
-	if (pid < 0 ){
+	if (pid < 0) {
 		//Estadisticas RUN_system a RUN_user
 		current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
 		current()->stats.elapsed_total_ticks = get_ticks();
@@ -366,9 +379,14 @@ int sys_get_stats (int pid, struct stats *st){
 			if (task[i].task.PID == pid && task[i].task.state != ST_FREE){
 				copy_to_user(&(task[i].task.stats), st, sizeof(struct stats));
 
-				//Estadisticas RUN_system a RUN_user
-				current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
-				current()->stats.elapsed_total_ticks = get_ticks();
+	for (i = 0; i < NR_TASKS; ++i){
+		if (task[i].task.PID == pid && task[i].task.state == ST_READY){
+			copy_to_user(&(task[i].task.stats), st, sizeof(struct stats));
+
+			//Estadisticas RUN_system a RUN_user
+			current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+			current()->stats.elapsed_total_ticks = get_ticks();
+
 
 				return 0;
 			}
@@ -386,7 +404,6 @@ int sys_get_stats (int pid, struct stats *st){
 int sys_sem_init (int n_sem, int value) {
 	//ebx: num_sem, ecx: value
 	//Creates a new semaphore with num: num_sem && blocked queue size: value
-	
 	//Estadisticas RUN_user a RUN_system
 	current()->stats.user_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
 	current()->stats.elapsed_total_ticks = get_ticks();
@@ -397,6 +414,7 @@ int sys_sem_init (int n_sem, int value) {
 		current()->stats.elapsed_total_ticks = get_ticks();
 
 	 	return -EINVAL;
+
 	}
 
 	if (sem_vector [n_sem].owner_pid == -1) { //Checks if it is initialized and also free!
@@ -411,7 +429,7 @@ int sys_sem_init (int n_sem, int value) {
 		//Estadisticas RUN_system a RUN_user
 		current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
 		current()->stats.elapsed_total_ticks = get_ticks();
-
+    
 		return -EBUSY;
 	}
 	//Estadisticas RUN_system a RUN_user
@@ -448,6 +466,7 @@ int sys_sem_wait (int n_sem) {
 		//Whops, someone must be blocked
 		update_process_state_rr(current(), (&(sem_vector [n_sem].blocked_processes)));
 		sched_next_rr(); //The next instruction will be executed when the sem. is destroyed or it is unblocked
+
 		if (sem_vector [n_sem].owner_pid == -1){
 			//Estadisticas RUN_system a RUN_user
 			current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
@@ -455,6 +474,7 @@ int sys_sem_wait (int n_sem) {
 
 			return -EINVAL;
 	 	}
+
 	}
 	else sem_vector [n_sem].num_blocked--;
 
@@ -466,6 +486,7 @@ int sys_sem_wait (int n_sem) {
 }
 
 int sys_sem_signal (int n_sem) {
+
 	//Estadisticas RUN_user a RUN_system
 	current()->stats.user_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
 	current()->stats.elapsed_total_ticks = get_ticks();
@@ -502,6 +523,7 @@ int sys_sem_signal (int n_sem) {
 }
 
 int sys_sem_destroy (int n_sem) {
+
 	//Estadisticas RUN_user a RUN_system
 	current()->stats.user_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
 	current()->stats.elapsed_total_ticks = get_ticks();
@@ -540,9 +562,84 @@ int sys_sem_destroy (int n_sem) {
 		return -EINVAL;
 	}
 
-	//Estadisticas RUN_system a RUN_user
-	current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
-	current()->stats.elapsed_total_ticks = get_ticks();
-
 	return some_blocked;
+}
+
+int sys_read (int fd, char* buf, int count) {
+	if (fd != 0) return -EBADF; //Not read
+	if (count <= 0) return -EINVAL;
+	if (!access_ok(VERIFY_WRITE, &buf[0], count)) return -EBADF;
+
+	current()->iorb.ubuf      = buf;
+	current()->iorb.remaining = count;
+	current()->iorb.last_pos  = 0; 
+
+	while (sys_read_keyboard());
+
+	return count;
+	
+}
+
+void *sys_sbrk(int increment) {
+	//Each process has its own HEAP, by default it will be NULL (0 frames in the heap)
+	if (increment > 0) {
+		//If it's a positive increment greater than 0 and it's 
+		void *ini	   = current()->heap.pointer_byte;
+		void *new_dir  = (void *)((increment) + ini); 
+		int new_frames = (new_dir - current()->heap.pointer_byte) >> 12; //Pag. number
+		
+		page_table_entry* PT = get_PT(current());
+		
+		int k = 1;
+		int i = 0;
+		unsigned int ph_pages [new_frames];
+		
+		int aux_ll = current()->heap.last_logical;
+		while (i < new_frames && k > 0) {
+			k = ph_pages [i] = alloc_frame();
+			set_ss_pag(PT, aux_ll++, k);
+			i++;
+		}
+
+		if (k < 0) {
+			int j;
+			for (j = 0; j < i; ++j) {
+				free_frame(ph_pages [j]);
+				del_ss_pag(PT, --aux_ll);
+			}
+			
+			return -ENOMEM;
+		}
+		
+		current()->heap.last_logical = aux_ll;
+		current()->heap.pointer_byte = new_dir;
+
+		//if (!(access_ok(VERIFY_WRITE, ini, increment) && access_ok(VERIFY_READ, ini, increment))) return -EFAULT;
+
+		return ini;
+	}
+	else if (increment == 0) return current()->heap.pointer_byte; 
+	else { //Substract
+		void *ini     = current()->heap.pointer_byte;
+		void *new_dir = (void *)(ini + increment);
+		int	bb_frames = (ini - new_dir) >> 12;
+
+		page_table_entry* PT = get_PT(current());
+
+		int i = 0;
+		int aux_ll = current()->heap.last_logical;
+		while (i < bb_frames) {
+			free_frame(get_frame(PT, aux_ll));
+			del_ss_pag(PT, aux_ll--);
+			++i;
+		}
+
+		current()->heap.last_logical = aux_ll;
+		current()->heap.pointer_byte = new_dir;
+
+		//if (!(access_ok(VERIFY_WRITE, new_dir, increment) && access_ok(VERIFY_READ, new_dir, increment))) return -EFAULT;
+
+		return new_dir;
+	}
+
 }

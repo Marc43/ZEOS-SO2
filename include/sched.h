@@ -40,6 +40,18 @@ struct stats {
 	unsigned long elapsed_total_ticks;
 };
 
+struct iorb {
+	char* ubuf;
+	int	  remaining;
+	int	  last_pos;
+	//Incomplete iorb bc is just for reading
+};
+
+struct heap {
+	int	  last_logical;
+	void* pointer_byte;
+};
+
 struct task_struct {
   int PID;			/* Process ID. This MUST be the first field of the struct. */
   page_table_entry* dir_pages_baseAddr;
@@ -54,6 +66,12 @@ struct task_struct {
   struct info_dir* info_dir_;
 
   struct stats stats;
+
+
+  struct iorb iorb;
+
+  struct heap heap;
+
 };
 
 union task_union {
