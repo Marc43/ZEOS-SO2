@@ -25,8 +25,10 @@ extern unsigned long last_PID;
 
 int check_fd(int fd, int permissions)
 {
-  if (fd!=1) return -9; /*EBADF*/
-  if (permissions!=ESCRIPTURA) return -13; /*EACCES*/
+  if (fd!=1 && fd != 0) return -9; /*EBADF*/
+  if (permissions!=ESCRIPTURA && fd == 1) return -13; /*EACCES*/	
+  if (permissions!=LECTURA && fd == 0) return -13; /*EACCES*/	
+	
   return 0;
 }
 
@@ -169,8 +171,8 @@ int sys_fork(){
 	child_union->task.stats.elapsed_total_ticks = get_ticks();
 
 	//Heap 
-	child_union->task.heap.last_logical = NUM_PAG_KERNEL + NUM_PAG_CODE + (2*NUM_PAG_DATA);
-	child_union->task.heap.pointer_byte = (NUM_PAG_KERNEL + NUM_PAG_CODE + (2*NUM_PAG_DATA))*PAGE_SIZE;
+	child_union->task.heap.last_logical = PAG_LOG_INIT_DATA + (2*NUM_PAG_DATA);
+	child_union->task.heap.pointer_byte = (PAG_LOG_INIT_DATA + (2*NUM_PAG_DATA))*PAGE_SIZE;
 
 	i = alloc_frame();
 	if (i > 0) set_ss_pag(PT_child, child_union->task.heap.last_logical++, i);
