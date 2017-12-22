@@ -111,7 +111,7 @@ int sys_fork(){
 	}
 	
 	copy_data(parent_union, child_union, sizeof(union task_union));
-	allocate_DIR(&(child_union->task));
+	if (!allocate_DIR(&(child_union->task))) return -ENOMEM;
 
 	i = 0;
 	page_table_entry* PT_child = get_PT(&(child_union->task));
@@ -184,6 +184,8 @@ void sys_exit() {
 	struct task_struct* in_cpu = current();
 	page_table_entry* PT = get_PT(in_cpu);
 	
+	int pPID = in_cpu->PID;
+
 	in_cpu->info_dir_->num_of--;
 	if (in_cpu->info_dir_->num_of <= 0) {
 		in_cpu->info_dir_->valid = 0;
@@ -196,14 +198,14 @@ void sys_exit() {
 	}
 
 	int i;
-	for (i = 0; i < NUM_SEMAPHORES; i++) {
-		if (sem_vector [i].owner_pid == in_cpu->PID) {
-			sys_sem_destroy(sem_vector [i].owner_pid);
+	for (i = 0; i < NUM_SEMAPHORES; i++) { //NUM_SEMAPHORES
+		if (sem_vector [i].owner_pid == pPID) {
+			sys_sem_destroy(i);
 		}
 	}
-
-	list_add_tail(&(current()->list), &freequeue);	
-
+	current()->state = ST_FREE;
+	update_process_state_rr (current(), &freequeue);
+//	list_add_tail(&(current()->list), &freequeue);	
 	current()->PID = -1; //To ensure our 'search' algorithm does not match at any cost
 
 	sched_next_rr();
@@ -213,7 +215,7 @@ void sys_exit() {
 
 int sys_clone (void (*function)(void), void* stack) {
 
-	if (!(access_ok(VERIFY_WRITE, stack, 4) && access_ok(VERIFY_READ, function, 4))) 	return -EFAULT;
+	if (!(access_ok(VERIFY_WRITE, stack, 4) && access_ok(VERIFY_READ, function, 4))) return -EFAULT;
 
 	if (!list_empty(&freequeue)) {	
 
@@ -224,18 +226,28 @@ int sys_clone (void (*function)(void), void* stack) {
 		union task_union* 	thread = (union task_union*) task_thread;
 		union task_union*	current_tasku = (union task_union*) current();
 
-		copy_data(&(current_tasku->stack[0]), &(thread->stack[0]), sizeof(union task_union));
+		copy_data(current_tasku, thread, sizeof(union task_union));
 
 		thread->task.kernel_esp = &(thread->stack[KERNEL_STACK_SIZE-18]); 
 		thread->task.PID = last_PID++;
-		thread->task.state = ST_READY;
 		thread->task.info_dir_->num_of++; //Update the number of proccesses on that directory...		
-		
+		thread->task.dir_pages_baseAddr = current_tasku->task.dir_pages_baseAddr; //Just in case...
+	
 		thread->stack[KERNEL_STACK_SIZE-2] = stack; 
 		thread->stack[KERNEL_STACK_SIZE-5] = function;
 		thread->stack[KERNEL_STACK_SIZE-18] = 0xaaaa;
 		thread->stack[KERNEL_STACK_SIZE-17] = &ret_from_fork;
-					
+		
+	
+		thread->task.state = ST_READY;
+		thread->task.stats.user_ticks = 0;
+		thread->task.stats.system_ticks = 0;
+		thread->task.stats.blocked_ticks = 0;
+		thread->task.stats.ready_ticks = 0;                   		
+		thread->task.stats.total_trans = 0;
+		thread->task.stats.remaining_ticks = 0;
+		thread->task.stats.elapsed_total_ticks = get_ticks(); 	
+			
 		list_add_tail(&(thread->task.list), &readyqueue);
 
 		return last_PID-1;
@@ -331,7 +343,7 @@ int sys_get_stats (int pid, struct stats *st){
  		return -EINVAL;
 	}
 	
-	if (access_ok(VERIFY_WRITE,st,sizeof(struct stats_s)) == 0){
+	if (access_ok(VERIFY_WRITE,st,sizeof(struct stats)) == 0){
 		//Estadisticas RUN_system a RUN_user
 		current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
 		current()->stats.elapsed_total_ticks = get_ticks();
@@ -341,7 +353,7 @@ int sys_get_stats (int pid, struct stats *st){
 
 	//Busqueda del PCB
 	if (current()->PID == pid){
-		copy_to_user(&(current()->stats), st, sizeof(struct stats_s));
+		copy_to_user(&(current()->stats), st, sizeof(struct stats));
 		
 		//Estadisticas RUN_system a RUN_user
 		current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
@@ -349,18 +361,20 @@ int sys_get_stats (int pid, struct stats *st){
 
 		return 0;
 	}
+	else{
+		for (i = 0; i < NR_TASKS; i++){
+			if (task[i].task.PID == pid && task[i].task.state != ST_FREE){
+				copy_to_user(&(task[i].task.stats), st, sizeof(struct stats));
 
-	for (i = 0; i < NR_TASKS; ++i){
-		if (task[i].task.PID == pid && task[i].task.state == ST_READY){
-			copy_to_user(&(task[i].task.stats), st, sizeof(struct stats_s));
+				//Estadisticas RUN_system a RUN_user
+				current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+				current()->stats.elapsed_total_ticks = get_ticks();
 
-			//Estadisticas RUN_system a RUN_user
-			current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
-			current()->stats.elapsed_total_ticks = get_ticks();
-
-			return 0;
+				return 0;
+			}
 		}
 	}
+
 	//Estadisticas RUN_system a RUN_user
 	current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
 	current()->stats.elapsed_total_ticks = get_ticks();
@@ -372,67 +386,163 @@ int sys_get_stats (int pid, struct stats *st){
 int sys_sem_init (int n_sem, int value) {
 	//ebx: num_sem, ecx: value
 	//Creates a new semaphore with num: num_sem && blocked queue size: value
-	if (n_sem >= 20) return -EINVAL;
+	
+	//Estadisticas RUN_user a RUN_system
+	current()->stats.user_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+	current()->stats.elapsed_total_ticks = get_ticks();
 
-	if (sem_vector [n_sem].owner_pid == -1) {
+	if (n_sem >= NUM_SEMAPHORES || n_sem < 0 || value < 0){
+		//Estadisticas RUN_system a RUN_user
+		current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+		current()->stats.elapsed_total_ticks = get_ticks();
+
+	 	return -EINVAL;
+	}
+
+	if (sem_vector [n_sem].owner_pid == -1) { //Checks if it is initialized and also free!
+		sem_vector [n_sem].owner_pid = current()->PID;
 		sem_vector [n_sem].max_blocked = value;
-		sem_vector [n_sem].num_blocked = 0;
+		sem_vector [n_sem].num_blocked = value; //TODO check 'value'
 		//We do nothing with the blocked queue by the moment...
 	}
 	else { 
 		printk("That semaphore already exists!");
-		
-		return -EINVAL;
+
+		//Estadisticas RUN_system a RUN_user
+		current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+		current()->stats.elapsed_total_ticks = get_ticks();
+
+		return -EBUSY;
 	}
+	//Estadisticas RUN_system a RUN_user
+	current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+	current()->stats.elapsed_total_ticks = get_ticks();
 
 	return 0;	
 }
 
 int sys_sem_wait (int n_sem) {
-	if (n_sem >= 20) return -EINVAL;
 
-	if (sem_vector [n_sem].owner_pid == -1) return -EINVAL;
+	//Estadisticas RUN_user a RUN_system
+	current()->stats.user_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+	current()->stats.elapsed_total_ticks = get_ticks();
 
-	if (sem_vector [n_sem].num_blocked <= 0) {
+
+	if (n_sem >= NUM_SEMAPHORES || n_sem < 0){
+		//Estadisticas RUN_system a RUN_user
+		current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+		current()->stats.elapsed_total_ticks = get_ticks();
+		
+		return -EINVAL;
+	}
+
+	if (sem_vector [n_sem].owner_pid == -1){
+		//Estadisticas RUN_system a RUN_user
+		current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+		current()->stats.elapsed_total_ticks = get_ticks();
+
+		return -EINVAL;
+	}
+
+    	if (sem_vector [n_sem].num_blocked <= 0) {
 		//Whops, someone must be blocked
 		update_process_state_rr(current(), (&(sem_vector [n_sem].blocked_processes)));
+		sched_next_rr(); //The next instruction will be executed when the sem. is destroyed or it is unblocked
+		if (sem_vector [n_sem].owner_pid == -1){
+			//Estadisticas RUN_system a RUN_user
+			current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+			current()->stats.elapsed_total_ticks = get_ticks();
+
+			return -EINVAL;
+	 	}
 	}
-	else
-		sem_vector [n_sem].num_blocked--;
-		
+	else sem_vector [n_sem].num_blocked--;
+
+	//Estadisticas RUN_system a RUN_user
+	current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+	current()->stats.elapsed_total_ticks = get_ticks();
+	
 	return 0;
 }
 
 int sys_sem_signal (int n_sem) {
-	if (n_sem >= 20) return -EINVAL;
+	//Estadisticas RUN_user a RUN_system
+	current()->stats.user_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+	current()->stats.elapsed_total_ticks = get_ticks();
 
-	if (sem_vector [n_sem].owner_pid == -1) return -EINVAL;
+	if (n_sem >= NUM_SEMAPHORES || n_sem < 0){
+		//Estadisticas RUN_system a RUN_user
+		current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+		current()->stats.elapsed_total_ticks = get_ticks();
+		
+		return -EINVAL;
+	}
 
-	if (sem_vector [n_sem].num_blocked == 0)
+	if (sem_vector [n_sem].owner_pid == -1){
+		//Estadisticas RUN_system a RUN_user
+		current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+		current()->stats.elapsed_total_ticks = get_ticks();
+		
+		return -EINVAL;
+	}
+	
+	if (sem_vector [n_sem].num_blocked > 0 || list_empty(&(sem_vector [n_sem].blocked_processes)))
 		sem_vector [n_sem].num_blocked++;
-	else {
-		sem_vector [n_sem].num_blocked--;
+	else if (!list_empty(&(sem_vector [n_sem].blocked_processes))){
 		struct list_head* lh = list_first(&(sem_vector [n_sem].blocked_processes));
 		struct task_struct* first = list_head_to_task_struct(lh);
-		update_process_state_rr(first, &readyqueue); //Unblock		
+		update_process_state_rr(first, &readyqueue); //Unblock			
 	}
+
+	//Estadisticas RUN_system a RUN_user
+	current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+	current()->stats.elapsed_total_ticks = get_ticks();
 
 	return 0;
 }
 
 int sys_sem_destroy (int n_sem) {
-	if (n_sem >= 20) return -EINVAL;
+	//Estadisticas RUN_user a RUN_system
+	current()->stats.user_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+	current()->stats.elapsed_total_ticks = get_ticks();
 
-	if (sem_vector [n_sem].owner_pid == -1) return -EINVAL;
+	if (n_sem >= NUM_SEMAPHORES || n_sem < 0){
+		//Estadisticas RUN_system a RUN_user
+		current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+		current()->stats.elapsed_total_ticks = get_ticks();
 
+	 	return -EINVAL;
+	}
+
+	int some_blocked = 0;
 	if (sem_vector [n_sem].owner_pid == current()->PID) {
 		sem_vector [n_sem].owner_pid   = -1;
-		sem_vector [n_sem].max_blocked = 0;
-		INIT_LIST_HEAD(&(sem_vector [n_sem].blocked_processes));
-		//TODO Check this out..	
-	}
-	else 
-		return -EINVAL;
+		sem_vector [n_sem].num_blocked = 0;
 
-	return 0;
+		struct list_head* blocked_queue = &(sem_vector[n_sem].blocked_processes);
+	
+		while (!blocked_queue) {
+			if (some_blocked == 0) some_blocked = -1;
+			struct list_head* lh = list_first(&(sem_vector [n_sem].blocked_processes));
+			struct task_struct* first = list_head_to_task_struct(lh);
+
+			update_process_state_rr(first, &readyqueue);
+		}
+
+		sem_vector [n_sem].max_blocked = 0;
+
+	}
+	else{
+		//Estadisticas RUN_system a RUN_user
+		current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+		current()->stats.elapsed_total_ticks = get_ticks();
+
+		return -EINVAL;
+	}
+
+	//Estadisticas RUN_system a RUN_user
+	current()->stats.system_ticks += get_ticks() - current()->stats.elapsed_total_ticks;
+	current()->stats.elapsed_total_ticks = get_ticks();
+
+	return some_blocked;
 }

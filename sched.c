@@ -43,11 +43,21 @@ page_table_entry * get_PT (struct task_struct *t)
 
 int allocate_DIR(struct task_struct *t) 
 {
-	//Search the first free DIR
-	int i = 0; int found = 0;
+    if (t->PID == 0) {
+		dir_ [0].valid = 1;
+		dir_ [0].num_of = 1;	    
+
+		t->info_dir_ = &(dir_ [0]);
+	    t->dir_pages_baseAddr = (page_table_entry*) &dir_pages[0];
+	
+		return 1;	
+	}	
+    
+    //Search the first free DIR
+	int i = 1; int found = 0;
 	while (!found  && i < NR_TASKS) { 
 		if (dir_ [i].valid == 0) found = 1;	
-		++i;
+		else ++i;
 	}
 	if (i >= NR_TASKS) return -1; 
 
@@ -72,22 +82,24 @@ void cpu_idle(void)
 
 void init_idle (void) {
 	
-	if (!list_empty(&freequeue)) { //Free processes available
+//	if (!list_empty(&freequeue)) { //Free processes available
 		struct list_head* lh = list_first (&freequeue);
 		list_del(lh);	
-		
 		struct task_struct* idle = list_head_to_task_struct(lh);
+		union task_union* idle_union = (union task_union*)idle;
+			
 		//Now the 'idle' points to our free PCB
 		idle->PID = last_PID++;
 		allocate_DIR(idle);
-		union task_union* idle_union = (union task_union*)idle;
+	
 		//Now the process has the PID 0, and a number of Page Directory assigned
-		idle_task = idle; //struct task_struct* idle_task = idle;
 		idle_union->stack[KERNEL_STACK_SIZE-1] = (unsigned long)&cpu_idle;
 		idle_union->stack[KERNEL_STACK_SIZE-2] = 0;
 		idle->kernel_esp = &(idle_union->stack [KERNEL_STACK_SIZE - 2]);
 		
-		idle->quantum = QUANTUM;
+		idle->quantum = QUANTUM;  // Recibe todo el quantum
+		
+		idle_task = idle; //struct task_struct* idle_task = idle;
 		
 		//Estadisticas del proceso Idle
 		idle->state = ST_READY; //??? No proper state ???
@@ -98,7 +110,7 @@ void init_idle (void) {
 		idle->stats.total_trans = 0;
 		idle->stats.remaining_ticks = 0;
 		idle->stats.elapsed_total_ticks = get_ticks();
-	}
+//	}
 
 }
 
@@ -106,40 +118,45 @@ void init_task1(void) {
 	if (!list_empty(&freequeue)) {
 		struct list_head* lh = list_first (&freequeue);
 		list_del(lh); 	
-	
 		struct task_struct* task1 = list_head_to_task_struct(lh);
+		union task_union* tu = (union task_union*)task1;
+		
 		task1->PID = last_PID++;
+		task1->quantum = QUANTUM;	// Recibe todo el quantum
+		
 		allocate_DIR(task1);
 		set_user_pages(task1); //Initialize pages for task1
+		tss.esp0 =(DWord)&(tu->stack[KERNEL_STACK_SIZE]);
+	
 		set_cr3(task1->dir_pages_baseAddr);
 		
-		union task_union* tu = (union task_union*)task1;
-		tss.esp0 = &(tu->stack[KERNEL_STACK_SIZE]);
-	
 		task1->kernel_esp = tss.esp0; //At the start, they point to the same memory position 
 		
-		set_quantum(task1, QUANTUM);
-		
+	//	set_quantum(task1, QUANTUM);
+		ticks_rr = task1->quantum;
+			
 		//Estadisticas del proceso task1
+
 		task1->stats.user_ticks = 0;
 		task1->stats.system_ticks = 0;
 	 	task1->stats.blocked_ticks = 0;
 		task1->stats.ready_ticks = 0;
 		task1->stats.total_trans = 0;
-		task1->stats.remaining_ticks = QUANTUM;
+		task1->stats.remaining_ticks = 0;
 		task1->stats.elapsed_total_ticks = get_ticks();
 		
-		update_process_state_rr(task1, NULL);
+		task1->state = ST_RUN;
+		//update_process_state_rr(task1, NULL);
 	}
 }
 
 void init_sched(){
-	init_free_queue();
+	init_dir_structure();
+    init_free_queue();
 	init_ready_queue();
 	init_idle();
 	init_task1();
 	init_semaphores();
-	init_dir_structure();
 }
 
 struct task_struct* current()
@@ -169,55 +186,92 @@ void init_ready_queue () {
 }
 
 void task_switch (union task_union* t) {
+	tss.esp0 = &(t->stack[KERNEL_STACK_SIZE]);
+//	ticks_rr = t->task.quantum;
+	
+	if (thread_of(current(), (struct task_struct*)t) == 0) set_cr3 (t->task.dir_pages_baseAddr);
+
 	__asm__ __volatile__ ( "pushl %esi;"
-						   "pushl %edi;"
-						   "pushl %ebx;");
+ 	 		       "pushl %edi;"
+			       "pushl %ebx;");
 	inner_task_switch(t);
+
 	__asm__ __volatile__ (	"popl %ebx;"
-						    "popl %edi;"
-							"popl %esi;");
+			        "popl %edi;"
+			        "popl %esi;");
 
 }
 
 void inner_task_switch (union task_union* t) {	
-	tss.esp0 = &(t->stack[KERNEL_STACK_SIZE]);
-	if (!thread_of(current(), t)) set_cr3 (t->task.dir_pages_baseAddr);
+
 	__asm__ __volatile__ ( 	"movl %%ebp, %0;" 
-						    "movl %1, %%esp;"
-							"popl %%ebp;"
-							"ret;"
-							: "=m" (current()->kernel_esp)
-							: "m" (t->task.kernel_esp)
-							:);
+			        "movl %1, %%esp;"
+				"popl %%ebp;"
+				"ret;"
+				: 
+				: "g" (current()->kernel_esp), "g" (t->task.kernel_esp)
+			     );
 
 }
 
 void update_sched_data_rr () {
 	current()->stats.remaining_ticks--;
+	current()->stats.elapsed_total_ticks++;
 	ticks_rr--; //I update the total of ticks executed by the current process
 }
 
 int needs_sched_rr () {
 	//When we take all the quantum or the current process is the idle task and there is a process ready to be executed	
-	if (ticks_rr == 0 || (current()->PID == 0 && !list_empty(&readyqueue))) return 1;
-	else return 0;
+//	if (ticks_rr == 0 || (current()->PID == 0 && !list_empty(&readyqueue))) return 1;
+//	else return 0;
+	return (ticks_rr == 0 || current()->stats.remaining_ticks == 0);
 }
 
 void update_process_state_rr (struct task_struct *t, struct list_head *dst_queue) {
 	struct list_head* lh = &(t->list);
 
+
+	// Proceso va a ejecucion 
+
 	if (dst_queue == NULL) {
 		t->state = ST_RUN;
+		return;
 	}
+
+	// Proceso va a la cola de ready's
+
 	else if (dst_queue == &(readyqueue)) {
+		
+		if (t->state == ST_BLOCKED){
+			// si el proceso viene de la cola de procesos bloqueados
+			t->stats.blocked_ticks += get_ticks() - t->stats.elapsed_total_ticks;
+			t->stats.elapsed_total_ticks = get_ticks();
+			list_del(lh);
+		}
+		else {
+
+			// si el proceso viene de ejecucion
+			t->stats.system_ticks += get_ticks() - t->stats.elapsed_total_ticks;
+			t->stats.elapsed_total_ticks = get_ticks();
+		}
+	
 		t->state = ST_READY;
-		
-		current()->stats.system_ticks += get_ticks()-current()->stats.elapsed_total_ticks;
-		current()->stats.elapsed_total_ticks = get_ticks();
-		
-		list_add_tail(lh, dst_queue); //By the moment only ready	
+		list_add_tail(lh, dst_queue);
+		return; 	
 	}
-	else {
+
+	// El proceso va a la cola de free's
+	else if (dst_queue == &(freequeue)){
+		t->state = ST_FREE;
+		list_add_tail(lh, dst_queue);
+		return;
+	}
+
+	// El proceso va a la cola de bloqueados
+
+	else { //From run to blocked
+		t->stats.system_ticks += get_ticks() - t->stats.elapsed_total_ticks;
+		t->stats.elapsed_total_ticks = get_ticks();
 		t->state = ST_BLOCKED;
 		list_add_tail(lh, dst_queue);
 	}	
@@ -235,16 +289,30 @@ void sched_next_rr () {
 		new->stats.elapsed_total_ticks = get_ticks();
 		new->stats.remaining_ticks = get_quantum(new);
 		new->stats.total_trans++;
-		current()->stats.total_trans++;
 		
 		//Cambio de estado del nuevo proceso a ST_RUN
-		update_process_state_rr(new, NULL);
+		new->state = ST_RUN;
+		//update_process_state_rr(new, NULL);
+	
+		ticks_rr = get_quantum(new);	
 	
 		//Ponemos el nuevo proceso a ejecutar			
 		task_switch((union task_union*) new);	
 	}
 	
-	else task_switch((union task_union*) idle_task);
+	else {
+		// Estadisticas para el idle_task
+		idle_task->stats.ready_ticks += get_ticks() - idle_task->stats.elapsed_total_ticks;
+		idle_task->stats.elapsed_total_ticks = get_ticks();
+		idle_task->stats.total_trans++;
+		idle_task->stats.remaining_ticks = get_quantum(idle_task);
+		idle_task->state = ST_RUN;		
+
+		ticks_rr = get_quantum(idle_task);
+
+		task_switch((union task_union*) idle_task);
+		
+	}
 }
 
 int get_quantum (struct task_struct *t) {
@@ -277,7 +345,7 @@ void init_semaphores() {
 
 void init_dir_structure() {
 	int i;
-	for (i = 0; i < NR_TASKS; ++i) {
+	for (i = 1; i < NR_TASKS; ++i) {
 		dir_ [i].valid = 0;
 		dir_ [i].num_of = 0;
 	}
@@ -290,7 +358,7 @@ int thread_of (struct task_struct *fth, struct task_struct *son) {
 		return 1;
 	}
 	
-	return -1;
+	return 0;//-1;
 
 	//This does not really check if is father -> son, just if they share the directory... :)
 }

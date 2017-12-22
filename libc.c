@@ -78,7 +78,7 @@ int write (int fd, char* buffer, int size) {
 }
 
 int gettime () {
-	long int ret = 0;
+	int ret = 0;
 	__asm__ __volatile__ ("movl $10, %%eax;"
 					      "int $0x80;"
 						  "movl %%eax, %0;"
@@ -96,7 +96,7 @@ int gettime () {
 }
 
 int getpid () {
-	long int ret = 0;
+	int ret = 0;
 	__asm__ __volatile__ ("movl $20, %%eax;"
 						  "int $0x80;"
 						  "movl %%eax, %0;"
@@ -114,7 +114,7 @@ int getpid () {
 }
 
 int fork () {
-	long int ret = 0;
+	int ret = 0;
 	__asm__ __volatile__ ("movl $2, %%eax;"
 						  "int $0x80;"
 					      "movl %%eax, %0;" //At this point, child and parent will have different return values
@@ -132,7 +132,7 @@ int fork () {
 }
 
 void exit () {
-	long int ret = 0;
+	int ret = 0;
 	__asm__ __volatile__ ("movl $1, %%eax;"
 						  "int $0x80;"
 						  "movl %%eax, %0;"
@@ -148,7 +148,7 @@ void exit () {
 }
 
 int clone (void (*function) (void), void *stack) {
-	long int ret;
+	int ret;
 	__asm__ __volatile__ ("movl $19, %%eax;"
 						  "int $0x80;"
 						  "movl %%eax, %0;"
@@ -182,7 +182,7 @@ int get_stats (int pid, struct stats *st){
 }
 
 int sem_init (int n_sem, unsigned int value) {
-	unsigned long int ret = -1;
+	int ret = -1;
 	__asm__ __volatile__ ("movl $21, %%eax;"
 						  "int  $0x80;"
                           "movl %%eax, %0;"
@@ -199,7 +199,7 @@ int sem_init (int n_sem, unsigned int value) {
 }
 
 int sem_wait (int n_sem) {
-	unsigned long int ret = -1;
+	int ret = -1;
 	__asm__ __volatile__ ("movl $22, %%eax;"
 						  "int  $0x80;"
                           "movl %%eax, %0;"
@@ -216,7 +216,7 @@ int sem_wait (int n_sem) {
 }
 
 int sem_signal (int n_sem) {
-	unsigned long int ret = -1;
+	int ret = -1;
 	__asm__ __volatile__ ("movl $23, %%eax;"
 						  "int  $0x80;"
                           "movl %%eax, %0;"
@@ -233,7 +233,7 @@ int sem_signal (int n_sem) {
 }
 
 int sem_destroy (int n_sem) {
-	unsigned long int ret = -1;
+	int ret = -1;
 	__asm__ __volatile__ ("movl $24, %%eax;"
 						  "int  $0x80;"
                           "movl %%eax, %0;"
