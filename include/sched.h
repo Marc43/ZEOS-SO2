@@ -28,7 +28,7 @@ struct info_dir {
 	unsigned int num_of;
 };
 
-enum state_t { ST_RUN, ST_READY, ST_BLOCKED };
+extern enum state_t { ST_FREE, ST_READY, ST_BLOCKED, ST_RUN };
 
 struct stats {
 	unsigned long user_ticks;
@@ -67,9 +67,11 @@ struct task_struct {
 
   struct stats stats;
 
+
   struct iorb iorb;
 
   struct heap heap;
+
 };
 
 union task_union {
