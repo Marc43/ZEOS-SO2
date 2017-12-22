@@ -124,14 +124,15 @@ void keyboard_routine () {
 	printc_xy(0x00, 0x00, char_to_print);
 
 	//We only care about the char if there are any processes waiting for it, otherwise, we don't save it
-
+	//SI esta full del estambul primero habra que leer y despues escribir!
 	if (!list_empty(&blocked) && make == 0) {
-		write_char_to_iobuf(char_to_print);
+		if (!full_iobuf()) 
+			write_char_to_iobuf(char_to_print);	
 	
 		struct list_head* lh  = list_first(&blocked);
 		struct task_struct* t = list_head_to_task_struct(lh);
 
-		if (len_iobuf() == t->iorb.remaining) 
+		if (len_iobuf() == t->iorb.remaining || full_iobuf()) 
 			update_process_state_rr(t, &readyqueue); //Run little one, run
 		
 	}		
